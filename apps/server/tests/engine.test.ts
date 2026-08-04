@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createNewGame, startDay } from '../src/engine/game'
+import { createNewGame, seedRng, startDay } from '../src/engine/game'
 
 describe('startDay daily events', () => {
   afterEach(() => {
@@ -42,5 +42,43 @@ describe('startDay daily events', () => {
         expect(c.resources.fish).toBe(fishBefore[id] + 2)
       }
     }
+  })
+})
+
+
+describe('seeded runs', () => {
+  afterEach(() => {
+    seedRng(null)
+  })
+
+  it('the same seed reproduces an identical first day', () => {
+    const a = startDay(createNewGame('a', 42))
+    const b = startDay(createNewGame('b', 42))
+
+    expect(a.merchantPrices).toEqual(b.merchantPrices)
+    expect(a.aiTurnOrder).toEqual(b.aiTurnOrder)
+    expect(a.dailyEvent).toBe(b.dailyEvent)
+  })
+
+  it('different seeds diverge', () => {
+    // single-day prices can legitimately collide in their small ranges, so
+    // compare a multi-day series: two different seeds must part ways somewhere
+    let a = startDay(createNewGame('a', 42))
+    let b = startDay(createNewGame('b', 1337))
+    const seriesA: number[] = []
+    const seriesB: number[] = []
+    for (let day = 0; day < 5; day++) {
+      a = startDay(a)
+      b = startDay(b)
+      seriesA.push(a.merchantPrices.fishPrice, a.merchantPrices.wheatPrice)
+      seriesB.push(b.merchantPrices.fishPrice, b.merchantPrices.wheatPrice)
+    }
+
+    expect(seriesA).not.toEqual(seriesB)
+  })
+
+  it('the seed rides on the game state for replay', () => {
+    expect(createNewGame('a', 42).seed).toBe(42)
+    expect(createNewGame('b').seed).toBeNull()
   })
 })

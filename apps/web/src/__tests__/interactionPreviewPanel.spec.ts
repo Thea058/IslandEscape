@@ -75,6 +75,7 @@ const baseState: GameState = {
   dungeonState: null,
   playerDungeonUsedToday: false,
   dailyEvent: 'none',
+  seed: null,
   updatedAt: '2026-05-24T00:00:00.000Z',
 }
 

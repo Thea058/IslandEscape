@@ -13,6 +13,7 @@ import {
   AI_CHARACTERS,
   GAME_CONFIG,
   friendshipKey,
+  mulberry32,
 } from '@game/shared'
 
 function nowIso(): string {
@@ -39,14 +40,30 @@ function safeResources(r: Partial<Resources> | undefined | null): Resources {
   }
 }
 
+let seededRng: (() => number) | null = null
+
+/**
+ * Point the engine's randomness at a deterministic PRNG, or back to
+ * Math.random with null. Module-level by design: this is a single-process
+ * toy server, and concurrent games with different seeds are out of scope.
+ * Seeding a run also stores the seed on its GameState so it can be replayed.
+ */
+export function seedRng(seed: number | null): void {
+  seededRng = seed === null ? null : mulberry32(seed)
+}
+
+function rng(): number {
+  return seededRng ? seededRng() : Math.random()
+}
+
 function randInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min
+  return Math.floor(rng() * (max - min + 1)) + min
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(rng() * (i + 1))
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
@@ -68,7 +85,7 @@ function generateMerchantPrices(): MerchantPrices {
 function rollDailyEvent(day: number): DailyEvent {
   // Day 1-2 are always calm so first-time players can find their feet.
   if (day <= 2) return 'none'
-  const r = Math.random()
+  const r = rng()
   if (r < 0.65) return 'none'
   if (r < 0.73) return 'storm'
   if (r < 0.81) return 'festival'
@@ -96,7 +113,8 @@ function makeCharacter(id: CharacterId): CharacterState {
 
 // ---- Initialization ----
 
-export function createNewGame(gameId: string): GameState {
+export function createNewGame(gameId: string, seed?: number | null): GameState {
+  if (seed !== undefined) seedRng(seed)
   const characters: Record<string, CharacterState> = {}
   for (const id of ALL_CHARACTERS) {
     characters[id] = makeCharacter(id)
@@ -127,6 +145,7 @@ export function createNewGame(gameId: string): GameState {
     playerNpcTradedToday: [],
     playerDungeonUsedToday: false,
     dailyEvent: 'none',
+    seed: seed ?? null,
     updatedAt: nowIso(),
   }
 }

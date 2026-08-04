@@ -64,15 +64,30 @@ function findLastNpcProposal(messages: NegotiationMessage[], target: CharacterId
 }
 
 const routes: FastifyPluginAsync = async (fastify) => {
-  // Create new game
-  fastify.post('/api/games', async (_request, reply) => {
+  // Create new game (optionally seeded for a replayable run)
+  fastify.post('/api/games', async (request, reply) => {
     const gameId = randomUUID()
-    let state = createNewGame(gameId)
+    const seed = (request.body as { seed?: number } | undefined)?.seed
+    let state = createNewGame(gameId, typeof seed === 'number' ? seed : null)
     state = startDay(state)
 
     sessions.set(gameId, { gameId, state, sseClients: new Set() })
     await persistGame(gameId, state)
 
+    return reply.send({ gameId, state })
+  })
+
+  // Replay: start a fresh run with the same seed as an existing game
+  fastify.post('/api/games/:id/replay', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const existing = sessions.get(id)
+    if (!existing) return reply.code(404).send({ error: 'game not found' })
+    const gameId = randomUUID()
+    let state = createNewGame(gameId, existing.state.seed)
+    state = startDay(state)
+
+    sessions.set(gameId, { gameId, state, sseClients: new Set() })
+    await persistGame(gameId, state)
     return reply.send({ gameId, state })
   })
 
