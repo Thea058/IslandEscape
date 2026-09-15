@@ -11,10 +11,10 @@ interface ChatCompletionResponse {
     message?: {
       content?: string | null
       /**
-       * DeepSeek's reasoning models (deepseek-v4-flash, deepseek-r1, …) emit
-       * the chain-of-thought in this separate field; `content` only fills in
-       * AFTER reasoning completes. If max_tokens is too low we get reasoning
-       * with empty content.
+       * DeepSeek's reasoning models (deepseek-flash, deepseek-v4-pro) emit the
+       * chain-of-thought in this separate field; `content` only fills in AFTER
+       * reasoning completes. If max_tokens is too low we get reasoning with
+       * empty content.
        */
       reasoning_content?: string | null
     }
@@ -36,7 +36,9 @@ async function createChatCompletion(
   console.log(`[llm] Model: ${env.OPENAI_MODEL}`)
   console.log(`[llm] Messages:\n${JSON.stringify(messages, null, 2)}`)
 
-  const baseURL = (env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
+  // No fallback here on purpose — env.ts defaults this to a vendor that
+  // matches OPENAI_MODEL's default, so the two can't drift apart.
+  const baseURL = env.OPENAI_BASE_URL.replace(/\/$/, '')
   const body: Record<string, unknown> = {
     model: env.OPENAI_MODEL,
     messages,
@@ -167,8 +169,8 @@ export async function chatJSON<T>(
       if (reasoningText) {
         console.warn(
           `[llm] Empty content but reasoning_content present (attempt ${attempt + 1}, finish=${finishReason ?? 'unknown'}). ` +
-          `This is a REASONING model (e.g. deepseek-v4-flash, deepseek-r1) that ran out of tokens before emitting the final answer. ` +
-          `Either raise OPENAI_MODEL maxTokens further, or switch to a non-reasoning model like 'deepseek/deepseek-chat'. ` +
+          `This is a REASONING model that spent its whole budget thinking and never emitted an answer. ` +
+          `Raise maxTokens in the caller, or point OPENAI_MODEL at a non-reasoning model if your endpoint offers one. ` +
           `Reasoning preview: ${reasoningText.slice(0, 200)}`,
         )
       } else {

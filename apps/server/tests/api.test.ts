@@ -18,7 +18,7 @@ interface StateResponse {
 describe('server api', () => {
   beforeAll(async () => {
     process.env.OPENAI_API_KEY ||= 'test-key'
-    process.env.OPENAI_MODEL ||= 'deepseek/deepseek-chat'
+    process.env.OPENAI_MODEL ||= 'deepseek-flash'
     process.env.DB_FILE_NAME = `file:${join(tmpdir(), `islandescape-api-${Date.now()}.db`).replace(/\\/g, '/')}`
     process.env.LOG_LEVEL ||= 'silent'
 

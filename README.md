@@ -115,7 +115,7 @@ The server is the single source of truth. The browser sends *actions*; the backe
 | 3D preview | Three.js — WebGL scene for character/model previews |
 | Backend | Fastify + Zod + Drizzle ORM + SQLite |
 | Game engine | Pure-function state machine with Zod-validated transitions |
-| AI agents | OpenAI-compatible API (DeepSeek via OpenRouter by default) |
+| AI agents | OpenAI-compatible API (DeepSeek's own endpoint by default) |
 | Shared | Zod schemas in `packages/shared`, one contract for web and server |
 
 ```
@@ -156,12 +156,12 @@ pnpm install
 cp .env.example .env
 ```
 
-Open `.env` and drop in any OpenAI-compatible key. The default points at OpenRouter with DeepSeek, which is cheap and fast enough for in-game dialogue:
+Open `.env` and drop in a DeepSeek API key. Any OpenAI-compatible endpoint works, but the defaults point at DeepSeek's own, which is cheap enough that a full game costs a few cents:
 
 ```
-OPENAI_API_KEY=<your-openrouter-or-openai-key>
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-OPENAI_MODEL=deepseek/deepseek-chat
+OPENAI_API_KEY=<your-deepseek-api-key>
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-flash
 DB_FILE_NAME=file:local.db
 LOG_LEVEL=info
 ```
@@ -175,7 +175,7 @@ pnpm dev
 - **Frontend:** http://localhost:5173
 - **Backend:** http://localhost:8787
 
-Open the frontend, click **NEW GAME**, and you're in the city. If NPC replies feel slow, that's the model API thinking — the game state and the rules are validated locally and stay correct regardless.
+Open the frontend, click **NEW GAME**, and you're in the city. Expect a day to take tens of seconds: `deepseek-flash` is a reasoning model, so each NPC call burns most of its budget on chain-of-thought before answering. That's latency, not a hang — the game state and the rules are validated locally and stay correct regardless.
 
 For a single-process production build, `pnpm build && pnpm start` serves both the API and the built web app from Fastify; set `HOST=0.0.0.0` and `PORT=<port>` when deploying.
 

@@ -332,10 +332,10 @@ Low-level LLM client. Talks to any OpenAI-compatible endpoint using plain `fetch
 
 Design notes worth knowing before you touch it:
 
-- **`response_format: { type: 'json_object' }` is requested, but not trusted.** Some OpenRouter providers reject it, so a 400 mentioning `response_format` triggers one retry without JSON mode rather than an error.
+- **`response_format: { type: 'json_object' }` is requested, but not trusted.** Not every OpenAI-compatible provider implements it, so a 400 mentioning `response_format` triggers one retry without JSON mode rather than an error.
 - **JSON is extracted by brace-balancing, not regex.** `extractJsonObject` walks the response from the first `{` and counts braces while tracking string state, so a `}` inside a quoted dialogue line doesn't truncate the object. Markdown fences are unwrapped first.
 - **Two attempts, then an empty object.** The retry re-prompts with a stricter "reply ONLY with valid JSON" message and a higher `max_tokens`, because the most common failure is truncation.
-- **`max_tokens: 8000` baseline** because DeepSeek reasoning models (R1, V4-flash) can burn 3-5k tokens on `reasoning_content` before emitting any `content`. If you see "empty content but reasoning_content present" in the logs, that's the model running out of budget mid-thought — switch to a non-reasoning model like `deepseek/deepseek-chat`.
+- **`max_tokens: 8000` baseline** because DeepSeek's reasoning models burn 3-5k tokens on `reasoning_content` before emitting any `content` — a measured `deepseek-flash` call spent 473 reasoning tokens to produce a 101-token answer. If you see "empty content but reasoning_content present" in the logs, that's the model running out of budget mid-thought: raise `maxTokens` in the caller. This is also where the game's turn latency comes from; the answer is short, the thinking is not.
 
 ### decision-agent.ts
 
@@ -397,7 +397,7 @@ Two details there are load-bearing:
 
 ### LLM cost
 
-Each AI turn = 1 decision call + 0-2 trade calls. Each negotiation = 2-5 calls. With 4 AIs, one day costs roughly 4-20 LLM calls. At DeepSeek pricing via OpenRouter, a full game costs well under $0.10.
+Each AI turn = 1 decision call + 0-2 trade calls. Each negotiation = 2-5 calls. With 4 AIs, one day costs roughly 4-20 LLM calls. At DeepSeek's direct pricing, a full game costs well under $0.10.
 
 ---
 
@@ -700,8 +700,8 @@ The `events` array is append-only and is **the** trigger for several watchers �
 
 ```
 OPENAI_API_KEY=<key>                          # Required
-OPENAI_BASE_URL=https://openrouter.ai/api/v1  # Any OpenAI-compatible endpoint
-OPENAI_MODEL=deepseek/deepseek-chat
+OPENAI_BASE_URL=https://api.deepseek.com      # Any OpenAI-compatible endpoint
+OPENAI_MODEL=deepseek-flash
 DB_FILE_NAME=file:local.db
 HOST=127.0.0.1
 PORT=8787
@@ -710,16 +710,18 @@ LOG_LEVEL=info
 
 Parsed and validated by Zod in `apps/server/src/env.ts`, which also loads the **root** `.env` (not a per-package one) and skips overriding under `NODE_ENV=test` / `VITEST=true` so tests control their own environment.
 
+`OPENAI_BASE_URL` and `OPENAI_MODEL` default as a **matched pair** — both DeepSeek. Change one and change the other, or you get a 404 that reads like a bad API key. The client joins them as `${OPENAI_BASE_URL}/chat/completions`, so the trailing slash is stripped and both `https://api.deepseek.com` and `https://api.deepseek.com/v1` resolve correctly.
+
 ### Changing LLM provider
 
 Just change `.env`:
 
+- **DeepSeek direct** (the default): `OPENAI_BASE_URL=https://api.deepseek.com`, model `deepseek-flash` or `deepseek-v4-pro`
 - **OpenRouter**: `OPENAI_BASE_URL=https://openrouter.ai/api/v1`, model like `deepseek/deepseek-chat`
-- **OpenAI direct**: drop `OPENAI_BASE_URL`, model like `gpt-4.1-nano`
+- **OpenAI direct**: `OPENAI_BASE_URL=https://api.openai.com/v1`, model like `gpt-4.1-nano`
 - **Local Ollama**: `OPENAI_BASE_URL=http://localhost:11434/v1`, model like `deepseek-r1:7b`
-- **DeepSeek direct**: `OPENAI_BASE_URL=https://api.deepseek.com/v1`, model like `deepseek-chat`
 
-Avoid reasoning models for the NPCs unless you raise the token budget — see the `reasoning_content` note in §5.
+The default model is itself a reasoning model, and that is where the game's turn latency comes from — see the `reasoning_content` note in §5. `maxTokens: 8000` is sized for it. If your provider offers a non-reasoning model, turns get noticeably snappier.
 
 ### Vite proxy
 
