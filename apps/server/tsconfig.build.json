@@ -1,0 +1,14 @@
+{
+  // Build-only config: same as tsconfig.json, minus the tests.
+  //
+  // `tsconfig.json` deliberately includes `tests/**/*.ts` so `pnpm typecheck`
+  // checks the test files. But `tsc` also *emits* whatever it includes, so
+  // building with that config drops compiled copies into `dist/tests/` — and
+  // vitest then collects both `tests/x.test.ts` and `dist/tests/x.test.js`,
+  // running the whole suite twice. Two of those copies each open the same
+  // SQLite file, and the second one dies in `beforeAll` on a 10s hook timeout.
+  //
+  // So: typecheck with tsconfig.json (tests included), build with this one.
+  "extends": "./tsconfig.json",
+  "exclude": ["dist", "node_modules", "tests"]
+}
