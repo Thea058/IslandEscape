@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useGameStore, CHARACTER_META } from '@/stores/game'
-import type { GameSSEEvent } from '@game/shared'
+import { GAME_CONFIG, RESOURCE_LABELS, type GameSSEEvent } from '@game/shared'
 
 const game = useGameStore()
 
 interface CharStateLine {
   id: string
   name: string
-  fish: number
-  wheat: number
+  cake: number
+  goods: number
+  might: number
   coins: number
 }
 
@@ -23,21 +24,43 @@ interface SummaryData {
 const summary = ref<SummaryData | null>(null)
 const visible = ref(false)
 
+/**
+ * The settlement state line, built from the same RESOURCE_LABELS registry the
+ * server writes it with. Hand-copying the names into this pattern is exactly how
+ * the previous version silently stopped matching on a rename — the rows just
+ * went blank, with no error anywhere.
+ */
+const STATE_LINE = new RegExp(
+  `^(.+?): ${RESOURCE_LABELS.cake} (-?\\d+), ${RESOURCE_LABELS.goods} (-?\\d+), ` +
+  `${RESOURCE_LABELS.might} (-?\\d+), ${RESOURCE_LABELS.coins} (-?\\d+)$`,
+)
+
+/**
+ * Log lines name characters the way the player sees them (辛仔, You), but the
+ * rest of this component keys on the machine id. Map back through the same table
+ * the names came from.
+ */
+const ID_BY_NAME = new Map(
+  Object.entries(CHARACTER_META).map(([id, meta]) => [meta.name, id]),
+)
+
 function parseLine(line: string): { kind: 'state' | 'eliminated' | 'escaped' | 'other'; data: unknown } {
-  let m = line.match(/^(\w+) was eliminated/)
+  let m = line.match(/^(.+?) starved to death\.$/)
   if (m) return { kind: 'eliminated', data: m[1] }
-  m = line.match(/^(\w+) reached/)
+  m = line.match(/^(.+?) reached /)
   if (m) return { kind: 'escaped', data: m[1] }
-  m = line.match(/^(\w+): fish (-?\d+), wheat (-?\d+), coins (-?\d+)/)
+  m = line.match(STATE_LINE)
   if (m) {
+    const name = m[1]!
     return {
       kind: 'state',
       data: {
-        id: m[1]!,
-        name: CHARACTER_META[m[1]!]?.name ?? m[1]!,
-        fish: Number(m[2]),
-        wheat: Number(m[3]),
-        coins: Number(m[4]),
+        id: ID_BY_NAME.get(name) ?? name,
+        name,
+        cake: Number(m[2]),
+        goods: Number(m[3]),
+        might: Number(m[4]),
+        coins: Number(m[5]),
       } satisfies CharStateLine,
     }
   }
@@ -75,9 +98,6 @@ function dismiss() {
   visible.value = false
 }
 
-function metaForId(id: string) {
-  return CHARACTER_META[id] ?? { name: id, emoji: '?', personality: '' }
-}
 </script>
 
 <template>
@@ -93,7 +113,7 @@ function metaForId(id: string) {
         </div>
 
         <p class="day-summary-flavor">
-          Night fell on the island. Everyone consumed 1 fish and 1 wheat to survive.
+          Night fell on the walled city. Everyone ate 1 {{ RESOURCE_LABELS.cake }} to survive.
         </p>
 
         <!-- Player line (highlighted) -->
@@ -101,15 +121,16 @@ function metaForId(id: string) {
           <div class="day-section-title">You</div>
           <div class="player-row">
             <span class="player-icon">🧑</span>
-            <span class="resource-chip resource-fish">🐟 {{ playerLine.fish }}</span>
-            <span class="resource-chip resource-wheat">🌾 {{ playerLine.wheat }}</span>
+            <span class="resource-chip resource-cake">🥮 {{ playerLine.cake }}</span>
+            <span class="resource-chip resource-goods">📦 {{ playerLine.goods }}</span>
+            <span class="resource-chip resource-might">👊 {{ playerLine.might }}</span>
             <span class="resource-chip resource-coins">💰 {{ playerLine.coins }}</span>
           </div>
         </div>
 
         <!-- AI lines -->
         <div v-if="aiLines.length > 0" class="day-summary-section">
-          <div class="day-section-title">Islanders</div>
+          <div class="day-section-title">Residents</div>
           <div
             v-for="line in aiLines"
             :key="line.id"
@@ -117,8 +138,9 @@ function metaForId(id: string) {
           >
             <span class="ai-name">{{ line.name }}</span>
             <span class="ai-resources">
-              <span class="resource-mini">🐟 {{ line.fish }}</span>
-              <span class="resource-mini">🌾 {{ line.wheat }}</span>
+              <span class="resource-mini">🥮 {{ line.cake }}</span>
+              <span class="resource-mini">📦 {{ line.goods }}</span>
+              <span class="resource-mini">👊 {{ line.might }}</span>
               <span class="resource-mini">💰 {{ line.coins }}</span>
             </span>
           </div>
@@ -128,25 +150,25 @@ function metaForId(id: string) {
         <div v-if="summary.eliminated.length > 0" class="day-summary-section eliminated-section">
           <div class="day-section-title danger">⚰️ Eliminated tonight</div>
           <div
-            v-for="id in summary.eliminated"
-            :key="id"
+            v-for="name in summary.eliminated"
+            :key="name"
             class="eliminated-row"
           >
-            <span class="ai-name">{{ metaForId(id).name }}</span>
+            <span class="ai-name">{{ name }}</span>
             <span class="elim-tag">ran out of food</span>
           </div>
         </div>
 
         <!-- Escapes -->
         <div v-if="summary.escaped.length > 0" class="day-summary-section escaped-section">
-          <div class="day-section-title good">⛵ Escaped the island</div>
+          <div class="day-section-title good">🚪 Bought their way out</div>
           <div
-            v-for="id in summary.escaped"
-            :key="id"
+            v-for="name in summary.escaped"
+            :key="name"
             class="escaped-row"
           >
-            <span class="ai-name">{{ metaForId(id).name }}</span>
-            <span class="esc-tag">reached 100 coins</span>
+            <span class="ai-name">{{ name }}</span>
+            <span class="esc-tag">reached {{ GAME_CONFIG.WIN_COINS }} {{ RESOURCE_LABELS.coins }}</span>
           </div>
         </div>
 
@@ -269,8 +291,9 @@ function metaForId(id: string) {
   font-weight: 700;
   background: rgba(255, 255, 255, 0.04);
 }
-.resource-fish { color: #76b5d2; border: 1px solid rgba(118, 181, 210, 0.35); }
-.resource-wheat { color: #e2c46a; border: 1px solid rgba(226, 196, 106, 0.35); }
+.resource-cake { color: #e2c46a; border: 1px solid rgba(226, 196, 106, 0.35); }
+.resource-goods { color: #dfa06d; border: 1px solid rgba(223, 160, 109, 0.35); }
+.resource-might { color: #e08a9a; border: 1px solid rgba(224, 138, 154, 0.35); }
 .resource-coins { color: #ffd54a; border: 1px solid rgba(255, 213, 74, 0.35); }
 
 .ai-row {

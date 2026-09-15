@@ -30,7 +30,7 @@ describe('server api', () => {
     await app.close()
   })
 
-  it('creates a game with the current Island Escape state contract', async () => {
+  it('creates a game with the current Kowloon Walled City state contract', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/games',
@@ -43,8 +43,9 @@ describe('server api', () => {
     expect(body.state.gameId).toBe(body.gameId)
     expect(body.state.phase).toBe('player_labor')
     expect(body.state.characters.player.resources).toMatchObject({
-      fish: 6,
-      wheat: 6,
+      cake: 5,
+      goods: 0,
+      might: 3,
       coins: 0,
     })
   })
@@ -75,13 +76,15 @@ describe('server api', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/api/games/${gameId}/action`,
-      payload: { type: 'fish' },
+      payload: { type: 'work' },
     })
 
     expect(res.statusCode).toBe(200)
     const { state } = res.json<StateResponse>()
     expect(state.phase).toBe('player_trade')
-    expect(state.characters.player.resources.fish).toBe(9)
+    // Odd jobs yield both: +1 Kong Soh Biscuits to eat, +2 Goods to sell.
+    expect(state.characters.player.resources.cake).toBe(6)
+    expect(state.characters.player.resources.goods).toBe(2)
   })
 
   it('rejects invalid player actions', async () => {
@@ -94,7 +97,7 @@ describe('server api', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/api/games/${gameId}/action`,
-      payload: { type: 'trade_merchant', sell: { fish: -1, wheat: 0 } },
+      payload: { type: 'trade_merchant', sell: { cake: -1, goods: 0 } },
     })
 
     expect(res.statusCode).toBe(400)
@@ -105,7 +108,7 @@ describe('server api', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/games/missing/action',
-      payload: { type: 'fish' },
+      payload: { type: 'work' },
     })
 
     expect(res.statusCode).toBe(404)

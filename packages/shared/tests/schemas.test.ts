@@ -17,8 +17,9 @@ function makeCharacter(id: CharacterId): CharacterState {
   return {
     id,
     resources: {
-      fish: GAME_CONFIG.STARTING_FISH,
-      wheat: GAME_CONFIG.STARTING_WHEAT,
+      cake: GAME_CONFIG.STARTING_CAKE,
+      goods: GAME_CONFIG.STARTING_GOODS,
+      might: GAME_CONFIG.STARTING_MIGHT,
       coins: GAME_CONFIG.STARTING_COINS,
     },
     tradeSlots: GAME_CONFIG.TRADE_SLOTS_PER_DAY,
@@ -34,24 +35,23 @@ function makeGameState(): GameState {
     phase: 'player_labor',
     characters: {
       player: makeCharacter('player'),
-      tom: makeCharacter('tom'),
-      sam: makeCharacter('sam'),
-      lily: makeCharacter('lily'),
-      jack: makeCharacter('jack'),
+      san: makeCharacter('san'),
+      shun: makeCharacter('shun'),
+      cyclone: makeCharacter('cyclone'),
+      simon: makeCharacter('simon'),
     },
     friendship: {
-      [friendshipKey('player', 'tom')]: 0,
+      [friendshipKey('player', 'san')]: 0,
     },
     merchantPrices: {
-      fishPrice: 3,
-      wheatPrice: 2,
+      cakePrice: 3,
+      goodsPrice: 2,
     },
-    pendingHarvests: [],
     log: [],
     eliminatedIds: [],
     escapedIds: [],
     winnerId: null,
-    aiTurnOrder: ['tom', 'sam', 'lily', 'jack'],
+    aiTurnOrder: ['san', 'shun', 'cyclone', 'simon'],
     currentAiIndex: 0,
     playerNpcTradedToday: [],
     dungeonState: null,
@@ -63,18 +63,18 @@ function makeGameState(): GameState {
 
 describe('shared schemas', () => {
   it('validates player actions for the current game API', () => {
-    expect(PlayerActionSchema.safeParse({ type: 'fish' }).success).toBe(true)
-    expect(PlayerActionSchema.safeParse({ type: 'farm' }).success).toBe(true)
+    expect(PlayerActionSchema.safeParse({ type: 'work' }).success).toBe(true)
+    expect(PlayerActionSchema.safeParse({ type: 'train' }).success).toBe(true)
     expect(PlayerActionSchema.safeParse({
       type: 'trade_merchant',
-      sell: { fish: 1, wheat: 0 },
+      sell: { cake: 1, goods: 0 },
     }).success).toBe(true)
   })
 
   it('rejects invalid player action payloads', () => {
     const result = PlayerActionSchema.safeParse({
       type: 'trade_merchant',
-      sell: { fish: -1, wheat: 0 },
+      sell: { cake: -1, goods: 0 },
     })
 
     expect(result.success).toBe(false)
@@ -99,6 +99,6 @@ describe('shared schemas', () => {
   })
 
   it('normalizes friendship keys regardless of argument order', () => {
-    expect(friendshipKey('tom', 'player')).toBe('player:tom')
+    expect(friendshipKey('san', 'player')).toBe('player:san')
   })
 })

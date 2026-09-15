@@ -380,7 +380,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      // Handle other actions (fish, farm, trade_merchant, end_turn)
+      // Handle other actions (work, train, trade_merchant, end_turn)
       session.state = applyPlayerAction(session.state, action)
       broadcastSSE(id, { type: 'state_update', state: session.state })
 

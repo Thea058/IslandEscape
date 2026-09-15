@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useGameStore } from '@/stores/game'
+import { GAME_CONFIG, LABOR_LABELS, RESOURCE_LABELS } from '@game/shared'
 import type { InteractionType } from '@/game/GameWorld'
 
 const props = defineProps<{
@@ -19,17 +20,17 @@ const promptText = computed(() => {
       return isTrade
         ? `Press E to talk to ${props.interaction.characterName}`
         : `(Trade phase only) ${props.interaction.characterName}`
-    case 'fish':
+    case 'work':
       return isLabor
-        ? 'Press E to go fishing (+3 fish)'
+        ? `Press E for ${LABOR_LABELS.work} (+${GAME_CONFIG.CAKE_PER_WORK} ${RESOURCE_LABELS.cake}, +${GAME_CONFIG.GOODS_PER_WORK} ${RESOURCE_LABELS.goods})`
         : '(Already labored today)'
-    case 'farm':
+    case 'train':
       return isLabor
-        ? 'Press E to plant wheat (+8 in 3 days)'
+        ? `Press E to ${LABOR_LABELS.train} (+${GAME_CONFIG.MIGHT_PER_TRAINING} ${RESOURCE_LABELS.might})`
         : '(Already labored today)'
     case 'merchant':
       return isTrade
-        ? 'Press E to trade with the ship'
+        ? 'Press E to trade at the market'
         : '(Trade phase only)'
     case 'dungeon':
       return isTrade
@@ -45,12 +46,12 @@ const promptIcon = computed(() => {
   switch (props.interaction.kind) {
     case 'npc':
       return 'NPC'
-    case 'fish':
-      return 'FISH'
-    case 'farm':
-      return 'FARM'
+    case 'work':
+      return 'WORK'
+    case 'train':
+      return 'TRAIN'
     case 'merchant':
-      return 'SHIP'
+      return 'MARKET'
     case 'dungeon':
       return 'CAVE'
     default:

@@ -1,12 +1,15 @@
 import {
   type GameState,
   type CharacterId,
+  type AICharacterId,
   type NegotiationMessage,
   type TradeOffer,
   friendshipKey,
   GAME_CONFIG,
+  RESOURCE_LABELS,
 } from '@game/shared'
-import { getPersonality } from './personalities'
+import { getPersonality, llmFacingName } from './personalities'
+import { formatResources, formatOffer } from './format'
 import { chatJSON } from './llm'
 
 interface NegotiationReply {
@@ -30,12 +33,12 @@ function sanitizeOffer(raw: unknown): TradeOffer {
     const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN
     return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0
   }
-  return { fish: num(r.fish), wheat: num(r.wheat), coins: num(r.coins) }
+  return { cake: num(r.cake), goods: num(r.goods), coins: num(r.coins) }
 }
 
 /** Has the LLM put any actual numbers on the table? Used to decide whether a reply is structured. */
 function offerIsMeaningful(o: TradeOffer): boolean {
-  return o.fish > 0 || o.wheat > 0 || o.coins > 0
+  return o.cake > 0 || o.goods > 0 || o.coins > 0
 }
 
 function buildNegotiationContext(
@@ -51,22 +54,24 @@ function buildNegotiationContext(
   const fKey = friendshipKey(charId, partnerId)
   const friendship = state.friendship[fKey] || 0
 
+  const partnerName = llmFacingName(partnerId)
+
   const lines: string[] = []
-  lines.push(`You are negotiating a trade with ${partnerId}.`)
-  lines.push(`Your resources: fish=${me.resources.fish}, wheat=${me.resources.wheat}, coins=${me.resources.coins}`)
-  lines.push(`${partnerId}'s resources: fish=${partner.resources.fish}, wheat=${partner.resources.wheat}, coins=${partner.resources.coins}`)
-  lines.push(`Friendship with ${partnerId}: ${friendship}`)
-  lines.push(`Merchant prices today: fish=${state.merchantPrices.fishPrice}c, wheat=${state.merchantPrices.wheatPrice}c`)
-  lines.push(`You need at least 2 fish and 2 wheat to survive tonight safely.`)
+  lines.push(`You are negotiating a trade with ${partnerName}.`)
+  lines.push(`Your resources: ${formatResources(me.resources)}`)
+  lines.push(`${partnerName}'s resources: ${formatResources(partner.resources)}`)
+  lines.push(`Friendship with ${partnerName}: ${friendship}`)
+  lines.push(`Market rates today: ${RESOURCE_LABELS.cake}=${state.merchantPrices.cakePrice}c, ${RESOURCE_LABELS.goods}=${state.merchantPrices.goodsPrice}c`)
+  lines.push(`You need at least 2 ${RESOURCE_LABELS.cake} to survive the next two nights safely.`)
   lines.push('')
 
   if (history.length > 0) {
     lines.push('Conversation so far:')
     for (const msg of history) {
       const proposalSuffix = msg.proposal
-        ? `  [proposal: ${msg.speaker} gives ${describeOffer(msg.proposal.offer)} and wants ${describeOffer(msg.proposal.request)}]`
+        ? `  [proposal: ${llmFacingName(msg.speaker)} gives ${formatOffer(msg.proposal.offer)} and wants ${formatOffer(msg.proposal.request)}]`
         : ''
-      lines.push(`  ${msg.speaker}: "${msg.text}"${proposalSuffix}`)
+      lines.push(`  ${llmFacingName(msg.speaker)}: "${msg.text}"${proposalSuffix}`)
     }
     lines.push('')
   }
@@ -75,15 +80,15 @@ function buildNegotiationContext(
   // exactly what it would be accepting / countering / rejecting.
   const lastPartnerProposal = [...history].reverse().find(m => m.speaker === partnerId && m.proposal)?.proposal
   if (lastPartnerProposal) {
-    lines.push(`${partnerId}'s latest concrete offer:`)
-    lines.push(`  - ${partnerId} would give: ${describeOffer(lastPartnerProposal.offer)}`)
-    lines.push(`  - ${partnerId} wants in return: ${describeOffer(lastPartnerProposal.request)}`)
+    lines.push(`${partnerName}'s latest concrete offer:`)
+    lines.push(`  - ${partnerName} would give: ${formatOffer(lastPartnerProposal.offer)}`)
+    lines.push(`  - ${partnerName} wants in return: ${formatOffer(lastPartnerProposal.request)}`)
     lines.push(`  → To accept these exact terms, set "accept": true.`)
     lines.push(`  → To counter, set new offer/request values.`)
     lines.push(`  → If the deal is bad for you, set "reject": true.`)
     lines.push('')
   } else {
-    lines.push(`${partnerId} has not put concrete numbers on the table yet — counter with your own offer/request, or reject if you do not want to trade.`)
+    lines.push(`${partnerName} has not put concrete numbers on the table yet — counter with your own offer/request, or reject if you do not want to trade.`)
     lines.push('')
   }
 
@@ -95,14 +100,6 @@ function buildNegotiationContext(
   return lines.join('\n')
 }
 
-function describeOffer(o: { fish: number; wheat: number; coins: number }): string {
-  const parts: string[] = []
-  if (o.fish) parts.push(`${o.fish} fish`)
-  if (o.wheat) parts.push(`${o.wheat} wheat`)
-  if (o.coins) parts.push(`${o.coins} coins`)
-  return parts.length === 0 ? 'nothing' : parts.join(', ')
-}
-
 const NEGOTIATION_SYSTEM_PROMPT = `You are an AI character in a trading game negotiating a deal.
 
 {PERSONALITY}
@@ -110,8 +107,8 @@ const NEGOTIATION_SYSTEM_PROMPT = `You are an AI character in a trading game neg
 Respond with a JSON object:
 {
   "text": "your dialogue line (1-2 sentences, stay in character, be natural and expressive)",
-  "offer": { "fish": 0, "wheat": 0, "coins": 0 },    // what YOU are giving (set when countering)
-  "request": { "fish": 0, "wheat": 0, "coins": 0 },  // what YOU want in return (set when countering)
+  "offer": { "cake": 0, "goods": 0, "coins": 0 },    // what YOU are giving (set when countering)
+  "request": { "cake": 0, "goods": 0, "coins": 0 },  // what YOU want in return (set when countering)
   "accept": false,   // true to agree to the partner's most recent concrete offer EXACTLY
   "reject": false    // true to walk away with no deal
 }
@@ -123,17 +120,24 @@ Critical rules — every reply MUST be one of three actions:
 
 Do NOT mirror the partner's proposal back at them with offer/request equal to what they just asked for — that is meaningless. Either accept it (set accept=true) or counter with different terms.
 
+The offer/request keys are "cake", "goods" and "coins" — always these exact keys, never the display names you see in the text.
+
 Guidelines:
 - Be in character! Use your personality in dialogue.
 - Reference your friendship level — friends get better deals.
-- Don't agree to trades that would leave you with less than 1 fish or 1 wheat.
+- Don't agree to trades that would leave you with less than 1 ${RESOURCE_LABELS.cake} (cake).
 - High friendship (>20) should make you more generous. Low friendship (<5) means you drive harder bargains.
 - If the partner's offer is unfair, counter with terms that favor YOU — don't just agree.
 - After 3 exchanges with no progress, lean toward accept (if reasonable) or reject. Don't endlessly chat.`
 
+/**
+ * `charId` is the SPEAKER and is always an AI (the human player replies through
+ * the HTTP action path, never through this function), so it is typed narrowly.
+ * `partnerId` stays a plain CharacterId — the player can be the counterparty.
+ */
 export async function getNegotiationReply(
   state: GameState,
-  charId: CharacterId,
+  charId: AICharacterId,
   partnerId: CharacterId,
   history: NegotiationMessage[],
 ): Promise<NegotiationReply> {
@@ -168,7 +172,7 @@ export async function getNegotiationReply(
 
 export async function getAITradeInitiation(
   state: GameState,
-  charId: CharacterId,
+  charId: AICharacterId,
   targetId: CharacterId,
 ): Promise<NegotiationReply> {
   const personality = getPersonality(charId)

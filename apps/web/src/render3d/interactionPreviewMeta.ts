@@ -14,31 +14,31 @@ export function getInteractionPreviewKey(interaction: InteractionType): string {
 export function getInteractionPreviewMeta(interaction: InteractionType): InteractionPreviewMeta {
   if (!interaction) {
     return {
-      title: 'Coastal Watch',
-      subtitle: 'Move near a resource, trader, or islander to inspect it here.',
+      title: 'Back Alleys',
+      subtitle: 'Move near a workshop, market stall, or resident to inspect it here.',
     }
   }
 
   switch (interaction.kind) {
-    case 'fish':
+    case 'work':
       return {
-        title: 'Fishing Waters',
-        subtitle: 'A fresh catch keeps the island nights manageable.',
+        title: 'Workshop',
+        subtitle: 'Odd jobs pay in biscuits and goods. The safe way to survive the night.',
       }
-    case 'farm':
+    case 'train':
       return {
-        title: 'Farmland',
-        subtitle: 'Plant now, harvest later. Wheat is the slower safety net.',
+        title: 'Martial Arts Hall',
+        subtitle: 'Practice kung fu. It earns nothing you can sell, but gives you leverage.',
       }
     case 'merchant':
       return {
-        title: 'Merchant Ship',
+        title: 'Night Market',
         subtitle: 'Today only. Convert surplus goods into escape money.',
       }
     case 'dungeon':
       return {
         title: 'Boss Dungeon',
-        subtitle: 'A boss guards the cave. Win for coins, lose and pay in resources. One run per day.',
+        subtitle: 'A boss rules the underworld. Win for coins, lose and pay in resources. One run per day.',
       }
     case 'npc':
       return {

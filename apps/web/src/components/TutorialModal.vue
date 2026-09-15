@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 
-const STORAGE_KEY = 'island-escape:tutorial-seen'
+const STORAGE_KEY = 'kowloon-walled-city:tutorial-seen'
 
 const props = defineProps<{
   /** Force-show even if previously dismissed (used by a help button later). */
@@ -19,9 +19,9 @@ interface Step {
 
 const steps: Step[] = [
   {
-    title: 'Welcome to Island Escape',
-    icon: '🏝️',
-    body: 'You are stranded with four AI islanders. First to reach 100 coins escapes — but everyone else is trying to win too. Survive each night by keeping at least 1 fish + 1 wheat in stock.',
+    title: 'Welcome to the Walled City',
+    icon: '🏙️',
+    body: 'You are locked in with four AI residents. First to reach 100 coins buys their way out — but everyone else is trying to win too. Survive each night by keeping at least 1 Kong Soh Biscuit in stock.',
   },
   {
     title: 'Move around',
@@ -31,22 +31,22 @@ const steps: Step[] = [
   {
     title: 'Day phases',
     icon: '⏳',
-    body: 'Each day has two phases. LABOR: walk to the fishing spot or farmland and press E. TRADE: sell to the merchant ship for coins, or talk to an islander to negotiate. Hint at the top of the screen always tells you what to do next.',
+    body: 'Each day has two phases. LABOR: walk to the workshop (odd jobs) or the martial arts hall (practice kung fu) and press E. TRADE: sell Goods at the night market for coins, or talk to a resident to negotiate. Hint at the top of the screen always tells you what to do next.',
   },
   {
-    title: 'Trade with islanders',
+    title: 'Trade with residents',
     icon: '🤝',
-    body: 'Walk up to an NPC, press E, and click Negotiate. Use Quick Trade for structured offers (e.g. "Buy 3 fish for 10 coins"). They may accept, counter, or reject. NPCs may also approach YOU with offers — a dialog will pop open.',
+    body: 'Walk up to an NPC, press E, and click Negotiate. Use Quick Trade for structured offers (e.g. "Buy 3 Goods for 10 Coins"). They may accept, counter, or reject. NPCs may also approach YOU with offers — a dialog will pop open.',
   },
   {
     title: 'End the day',
     icon: '🌙',
-    body: 'When you\'re done, click End Turn. Watch the AI take their moves, then night falls and everyone consumes 1 fish + 1 wheat. Run out of either and you\'re eliminated.',
+    body: 'When you\'re done, click End Turn. Watch the AI take their moves, then night falls and everyone eats 1 Kong Soh Biscuit. Run out and you\'re eliminated — Goods will not feed you.',
   },
   {
-    title: 'Bonus: the cave',
+    title: 'Bonus: the underworld',
     icon: '⚔️',
-    body: 'A dark cave on the north shore hides a boss. Beating it earns +20 coins; losing costs resources. One run per day, costs 1 trade slot.',
+    body: 'A dark passage below the city hides a boss. Beating it earns +20 coins; losing costs resources. One run per day, costs 1 trade slot.',
   },
 ]
 

@@ -5,19 +5,19 @@ import { getInteractionPreviewKey, getInteractionPreviewMeta } from '@/render3d/
 describe('interaction preview metadata', () => {
   it('returns the default preview state', () => {
     expect(getInteractionPreviewKey(null)).toBe('default')
-    expect(getInteractionPreviewMeta(null).title).toBe('Coastal Watch')
+    expect(getInteractionPreviewMeta(null).title).toBe('Back Alleys')
   })
 
   it('maps direct resource interactions', () => {
-    expect(getInteractionPreviewKey({ kind: 'fish' })).toBe('fish')
-    expect(getInteractionPreviewMeta({ kind: 'farm' }).title).toBe('Farmland')
-    expect(getInteractionPreviewMeta({ kind: 'merchant' }).title).toBe('Merchant Ship')
+    expect(getInteractionPreviewKey({ kind: 'work' })).toBe('work')
+    expect(getInteractionPreviewMeta({ kind: 'train' }).title).toBe('Martial Arts Hall')
+    expect(getInteractionPreviewMeta({ kind: 'merchant' }).title).toBe('Night Market')
   })
 
   it('includes npc identity in the preview key and label', () => {
-    const interaction = { kind: 'npc', characterId: 'tom', characterName: 'Tom' } as const
+    const interaction = { kind: 'npc', characterId: 'san', characterName: 'San' } as const
 
-    expect(getInteractionPreviewKey(interaction)).toBe('npc:tom')
-    expect(getInteractionPreviewMeta(interaction).title).toBe('Tom')
+    expect(getInteractionPreviewKey(interaction)).toBe('npc:san')
+    expect(getInteractionPreviewMeta(interaction).title).toBe('San')
   })
 })

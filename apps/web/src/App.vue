@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from 'vue'
-import { useGameStore } from '@/stores/game'
+import { useGameStore, characterMeta } from '@/stores/game'
 import GameCanvas from '@/components/GameCanvas.vue'
 import HUD from '@/components/HUD.vue'
 import DialoguePanel from '@/components/DialoguePanel.vue'
@@ -79,8 +79,8 @@ const showGameOverOverlay = computed(() => {
 
 const gameOverMessage = computed(() => {
   if (!game.state) return ''
-  if (game.winner === 'player') return 'You escaped the island! Victory!'
-  if (game.winner) return `${game.winner} escaped the island. You lost.`
+  if (game.winner === 'player') return 'You bought your way out! Victory!'
+  if (game.winner) return `${characterMeta(game.winner).name} bought their way out. You lost.`
   if (!game.playerAlive) return 'You have been eliminated. Game Over.'
   return 'Game Over.'
 })
@@ -94,7 +94,7 @@ const gameOverMessage = computed(() => {
         <div class="title-island">
           <div class="pixel-island"></div>
         </div>
-        <h1 class="title-heading">ISLAND ESCAPE</h1>
+        <h1 class="title-heading">KOWLOON WALLED CITY</h1>
         <p class="title-sub">A survival trading game with AI agents</p>
       </div>
 
@@ -110,13 +110,13 @@ const gameOverMessage = computed(() => {
       <div class="title-instructions">
         <h3 class="instructions-heading">How to play</h3>
         <ul class="instructions-list">
-          <li><strong>WASD</strong> to move your character on the island</li>
-          <li><strong>E / Space</strong> to interact with NPCs, fishing spots, farms, and the ship</li>
-          <li><strong>Gather</strong> fish and wheat each day to survive</li>
-          <li><strong>Trade</strong> with the merchant ship to earn coins</li>
-          <li><strong>Negotiate</strong> with other islanders for better deals</li>
-          <li>Each night costs 1 fish + 1 wheat -- run out and you're eliminated!</li>
-          <li>First to collect <strong>100 coins</strong> escapes the island and wins!</li>
+          <li><strong>WASD</strong> to move your character through the walled city</li>
+          <li><strong>E / Space</strong> to interact with residents, workshops, the martial arts hall, and the market</li>
+          <li><strong>Labor</strong> once each day — do odd jobs for Kong Soh Biscuits and Goods, or practice kung fu for Might</li>
+          <li><strong>Trade</strong> at the night market to turn Goods into Coins</li>
+          <li><strong>Negotiate</strong> with other residents for better deals</li>
+          <li>Each night costs 1 Kong Soh Biscuit -- run out and you're eliminated!</li>
+          <li>First to collect <strong>100 Coins</strong> buys their way out and wins!</li>
         </ul>
       </div>
     </div>
@@ -192,7 +192,7 @@ const gameOverMessage = computed(() => {
             <p>Damage dealt: {{ game.dungeonResult.damageDealt }}</p>
             <p>Damage taken: {{ game.dungeonResult.damageTaken }}</p>
             <p>Cards: {{ game.dungeonResult.cardsCollected }}</p>
-            <button class="dungeon-leave-btn" @click="onDungeonResult(!!game.dungeonResult?.win)">Return to Island</button>
+            <button class="dungeon-leave-btn" @click="onDungeonResult(!!game.dungeonResult?.win)">Return to the City</button>
           </div>
         </div>
       </div>

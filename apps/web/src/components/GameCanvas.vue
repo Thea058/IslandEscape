@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useGameStore, CHARACTER_META } from '@/stores/game'
+import { useGameStore, characterMeta } from '@/stores/game'
 import { GameRenderer } from '@/game/GameRenderer'
 import type { InteractionType, GameWorldEvent } from '@/game/GameWorld'
+import { GAME_CONFIG, type CharacterId } from '@game/shared'
 
 const emit = defineEmits<{
   'interaction-change': [interaction: InteractionType]
@@ -59,10 +60,12 @@ onBeforeUnmount(() => {
 function initializeCharacters() {
   if (!renderer || !game.state) return
 
-  const charIds = Object.keys(game.state.characters)
+  // `state.characters` is keyed by CharacterId; Object.keys widens the
+  // keys to string, so widen it back at this one boundary.
+  const charIds = Object.keys(game.state.characters) as CharacterId[]
   const names: Record<string, string> = {}
   for (const id of charIds) {
-    names[id] = CHARACTER_META[id]?.name ?? id
+    names[id] = characterMeta(id).name
   }
 
   renderer.world.initCharacters(charIds, names)
@@ -183,12 +186,15 @@ watch(
       // emit the +N reward floating text only after arrival.
       const labor = decision.labor as Record<string, unknown> | undefined
       if (labor) {
-        const action = (labor.labor as string) || 'fish'
+        const action = labor.labor === 'train' ? 'train' : 'work'
         world.enqueueAIAnimation(charId, async () => {
           await world.animateAIMove(charId, action)
           const c = world.characters.get(charId)
           if (!c) return
-          const text = action === 'fish' ? '+3 Fish' : action === 'farm' ? 'Planted!' : action
+          // Icons rather than labels — "Kong Soh Biscuits" will not fit over a sprite's head.
+          const text = action === 'train'
+            ? `+${GAME_CONFIG.MIGHT_PER_TRAINING} 👊`
+            : `+${GAME_CONFIG.CAKE_PER_WORK} 🥮 +${GAME_CONFIG.GOODS_PER_WORK} 📦`
           world.showFloatingText(c.col, c.row, text, 0xffee44)
         })
       }

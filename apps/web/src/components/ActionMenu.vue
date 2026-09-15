@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useGameStore, CHARACTER_META } from '@/stores/game'
 import type { InteractionType } from '@/game/GameWorld'
-import type { CharacterId } from '@game/shared'
+import { GAME_CONFIG, LABOR_LABELS, RESOURCE_LABELS, type AICharacterId } from '@game/shared'
 
 const props = defineProps<{
   interaction: InteractionType
@@ -10,19 +10,19 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  'start-negotiation': [target: CharacterId]
+  'start-negotiation': [target: AICharacterId]
   'open-merchant': []
 }>()
 
 const game = useGameStore()
-const fishSellQty = ref(0)
-const wheatSellQty = ref(0)
+const cakeSellQty = ref(0)
+const goodsSellQty = ref(0)
 
 const isLaborPhase = computed(() => game.phase === 'player_labor')
 const isTradePhase = computed(() => game.phase === 'player_trade')
 
-const maxFish = computed(() => game.playerState?.resources.fish ?? 0)
-const maxWheat = computed(() => game.playerState?.resources.wheat ?? 0)
+const maxCake = computed(() => game.playerState?.resources.cake ?? 0)
+const maxGoods = computed(() => game.playerState?.resources.goods ?? 0)
 
 // Friendship for NPC interactions
 const npcFriendship = computed(() => {
@@ -53,12 +53,12 @@ const menuTitle = computed(() => {
   switch (props.interaction.kind) {
     case 'npc':
       return props.interaction.characterName
-    case 'fish':
-      return 'Fishing Spot'
-    case 'farm':
-      return 'Farmland'
+    case 'work':
+      return 'Workshop 工场'
+    case 'train':
+      return 'Martial Arts Hall 武馆'
     case 'merchant':
-      return 'Merchant Ship'
+      return 'Night Market 夜市'
     case 'dungeon':
       return 'Dark Cave'
     default:
@@ -66,17 +66,17 @@ const menuTitle = computed(() => {
   }
 })
 
-async function doFish() {
-  await game.submitAction({ type: 'fish' })
+async function doWork() {
+  await game.submitAction({ type: 'work' })
   emit('close')
 }
 
-async function doFarm() {
-  await game.submitAction({ type: 'farm' })
+async function doTrain() {
+  await game.submitAction({ type: 'train' })
   emit('close')
 }
 
-function startTrade(target: CharacterId) {
+function startTrade(target: AICharacterId) {
   // Don't send API yet — open dialogue panel and let player type first message
   game.openNegotiation(target, `conv_${Date.now()}`)
   emit('close')
@@ -88,16 +88,16 @@ async function enterDungeon() {
 }
 
 async function doMerchantSell() {
-  if (fishSellQty.value <= 0 && wheatSellQty.value <= 0) return
+  if (cakeSellQty.value <= 0 && goodsSellQty.value <= 0) return
   // Clamp to available resources
-  const fish = Math.min(fishSellQty.value, maxFish.value)
-  const wheat = Math.min(wheatSellQty.value, maxWheat.value)
+  const cake = Math.min(cakeSellQty.value, maxCake.value)
+  const goods = Math.min(goodsSellQty.value, maxGoods.value)
   await game.submitAction({
     type: 'trade_merchant',
-    sell: { fish, wheat },
+    sell: { cake, goods },
   })
-  fishSellQty.value = 0
-  wheatSellQty.value = 0
+  cakeSellQty.value = 0
+  goodsSellQty.value = 0
   emit('close')
 }
 </script>
@@ -109,28 +109,28 @@ async function doMerchantSell() {
       <button class="menu-close" @click="emit('close')">X</button>
     </div>
 
-    <!-- LABOR PHASE: only fish/farm -->
-    <div v-if="isLaborPhase && interaction.kind === 'fish'" class="menu-body">
+    <!-- LABOR PHASE: only work/train -->
+    <div v-if="isLaborPhase && interaction.kind === 'work'" class="menu-body">
       <div class="phase-tag labor">LABOR PHASE</div>
-      <button class="menu-action-btn" :disabled="game.isLoading" @click="doFish">
-        <span class="action-icon">Fish</span>
-        <span>Go Fishing (+3 fish)</span>
+      <button class="menu-action-btn" :disabled="game.isLoading" @click="doWork">
+        <span class="action-icon">Work</span>
+        <span>{{ LABOR_LABELS.work }} (+{{ GAME_CONFIG.CAKE_PER_WORK }} {{ RESOURCE_LABELS.cake }}, +{{ GAME_CONFIG.GOODS_PER_WORK }} {{ RESOURCE_LABELS.goods }})</span>
       </button>
       <div class="menu-note">You must labor first, then you can trade.</div>
     </div>
 
-    <div v-else-if="isLaborPhase && interaction.kind === 'farm'" class="menu-body">
+    <div v-else-if="isLaborPhase && interaction.kind === 'train'" class="menu-body">
       <div class="phase-tag labor">LABOR PHASE</div>
-      <button class="menu-action-btn" :disabled="game.isLoading" @click="doFarm">
-        <span class="action-icon">Farm</span>
-        <span>Plant Wheat (+8 in 3 days)</span>
+      <button class="menu-action-btn" :disabled="game.isLoading" @click="doTrain">
+        <span class="action-icon">Train</span>
+        <span>{{ LABOR_LABELS.train }} (+{{ GAME_CONFIG.MIGHT_PER_TRAINING }} {{ RESOURCE_LABELS.might }})</span>
       </button>
-      <div class="menu-note">Wheat will be ready to harvest in 3 days.</div>
+      <div class="menu-note">{{ RESOURCE_LABELS.might }} does not feed you today — it is what you spend to force a trade.</div>
     </div>
 
     <div v-else-if="isLaborPhase" class="menu-body">
       <div class="phase-tag labor">LABOR PHASE</div>
-      <div class="menu-note">You must fish or farm first! Walk to a fishing spot or farmland.</div>
+      <div class="menu-note">You must do {{ LABOR_LABELS.work }} or {{ LABOR_LABELS.train }} first! Walk to the workshop or the martial arts hall.</div>
     </div>
 
     <!-- TRADE PHASE: NPC, merchant -->
@@ -175,12 +175,12 @@ async function doMerchantSell() {
       </button>
     </div>
 
-    <div v-else-if="isTradePhase && interaction.kind === 'fish'" class="menu-body">
+    <div v-else-if="isTradePhase && interaction.kind === 'work'" class="menu-body">
       <div class="phase-tag trade">TRADE PHASE</div>
       <div class="menu-note">You already labored today. Use your trade slots or end your turn.</div>
     </div>
 
-    <div v-else-if="isTradePhase && interaction.kind === 'farm'" class="menu-body">
+    <div v-else-if="isTradePhase && interaction.kind === 'train'" class="menu-body">
       <div class="phase-tag trade">TRADE PHASE</div>
       <div class="menu-note">You already labored today. Use your trade slots or end your turn.</div>
     </div>
@@ -188,46 +188,46 @@ async function doMerchantSell() {
     <div v-else-if="isTradePhase && interaction.kind === 'merchant'" class="menu-body">
       <div class="phase-tag trade">TRADE PHASE</div>
       <div class="merchant-prices">
-        <span>Fish: {{ game.merchantPrices.fishPrice }}c each</span>
-        <span>Wheat: {{ game.merchantPrices.wheatPrice }}c each</span>
+        <span>{{ RESOURCE_LABELS.cake }}: {{ game.merchantPrices.cakePrice }}c each</span>
+        <span>{{ RESOURCE_LABELS.goods }}: {{ game.merchantPrices.goodsPrice }}c each</span>
       </div>
 
       <template v-if="game.playerTradeSlots > 0">
         <div class="merchant-sell-row">
-          <label>Sell Fish:</label>
+          <label>Sell {{ RESOURCE_LABELS.cake }}:</label>
           <input
-            v-model.number="fishSellQty"
+            v-model.number="cakeSellQty"
             type="number"
             :min="0"
-            :max="maxFish"
+            :max="maxCake"
             class="merchant-input"
           />
-          <button class="max-btn" @click="fishSellQty = maxFish">MAX</button>
+          <button class="max-btn" @click="cakeSellQty = maxCake">MAX</button>
         </div>
 
         <div class="merchant-sell-row">
-          <label>Sell Wheat:</label>
+          <label>Sell {{ RESOURCE_LABELS.goods }}:</label>
           <input
-            v-model.number="wheatSellQty"
+            v-model.number="goodsSellQty"
             type="number"
             :min="0"
-            :max="maxWheat"
+            :max="maxGoods"
             class="merchant-input"
           />
-          <button class="max-btn" @click="wheatSellQty = maxWheat">MAX</button>
+          <button class="max-btn" @click="goodsSellQty = maxGoods">MAX</button>
         </div>
 
         <div class="merchant-total">
-          Total: {{ fishSellQty * game.merchantPrices.fishPrice + wheatSellQty * game.merchantPrices.wheatPrice }} coins
+          Total: {{ cakeSellQty * game.merchantPrices.cakePrice + goodsSellQty * game.merchantPrices.goodsPrice }} {{ RESOURCE_LABELS.coins }}
         </div>
 
         <button
           class="menu-action-btn"
-          :disabled="(fishSellQty <= 0 && wheatSellQty <= 0) || game.isLoading"
+          :disabled="(cakeSellQty <= 0 && goodsSellQty <= 0) || game.isLoading"
           @click="doMerchantSell"
         >
           <span class="action-icon">Sell</span>
-        <span>Sell to Merchant</span>
+        <span>Sell to the Market</span>
       </button>
       </template>
 

@@ -1,5 +1,5 @@
 // ============================================================
-// Island Escape — Audio Manager (Web Audio API chiptune SFX)
+// Kowloon Walled City — Audio Manager (Web Audio API chiptune SFX)
 // ============================================================
 
 let audioCtx: AudioContext | null = null

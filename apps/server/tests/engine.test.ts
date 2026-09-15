@@ -7,39 +7,39 @@ describe('startDay daily events', () => {
     vi.restoreAllMocks()
   })
 
-  it('bumper crop gives every alive character +2 wheat at dawn', () => {
-    // 0.9 lands in the bumper_crop band of rollDailyEvent for day >= 3.
+  it('cargo spill gives every alive character +2 goods at dawn', () => {
+    // 0.9 lands in the cargo_spill band of rollDailyEvent for day >= 3.
     vi.spyOn(Math, 'random').mockReturnValue(0.9)
     const game = { ...createNewGame('g1'), day: 3 }
-    const wheatBefore = Object.fromEntries(
-      Object.entries(game.characters).map(([id, c]) => [id, c.resources.wheat]),
+    const goodsBefore = Object.fromEntries(
+      Object.entries(game.characters).map(([id, c]) => [id, c.resources.goods]),
     )
 
     const next = startDay(game)
 
-    expect(next.dailyEvent).toBe('bumper_crop')
+    expect(next.dailyEvent).toBe('cargo_spill')
     for (const [id, c] of Object.entries(next.characters)) {
       if (c.alive && !c.escaped) {
-        expect(c.resources.wheat).toBe(wheatBefore[id] + 2)
+        expect(c.resources.goods).toBe(goodsBefore[id] + 2)
       }
     }
-    expect(next.log.some((line) => line.includes('Bumper Crop'))).toBe(true)
+    expect(next.log.some((line) => line.includes('Cargo Spill'))).toBe(true)
   })
 
-  it('lucky catch still gives +2 fish (unchanged sibling event)', () => {
-    // 0.85 lands in the lucky_catch band for day >= 3.
+  it('windfall still gives +2 cake (unchanged sibling event)', () => {
+    // 0.85 lands in the windfall band for day >= 3.
     vi.spyOn(Math, 'random').mockReturnValue(0.85)
     const game = { ...createNewGame('g2'), day: 3 }
-    const fishBefore = Object.fromEntries(
-      Object.entries(game.characters).map(([id, c]) => [id, c.resources.fish]),
+    const cakeBefore = Object.fromEntries(
+      Object.entries(game.characters).map(([id, c]) => [id, c.resources.cake]),
     )
 
     const next = startDay(game)
 
-    expect(next.dailyEvent).toBe('lucky_catch')
+    expect(next.dailyEvent).toBe('windfall')
     for (const [id, c] of Object.entries(next.characters)) {
       if (c.alive && !c.escaped) {
-        expect(c.resources.fish).toBe(fishBefore[id] + 2)
+        expect(c.resources.cake).toBe(cakeBefore[id] + 2)
       }
     }
   })
@@ -70,8 +70,8 @@ describe('seeded runs', () => {
     for (let day = 0; day < 5; day++) {
       a = startDay(a)
       b = startDay(b)
-      seriesA.push(a.merchantPrices.fishPrice, a.merchantPrices.wheatPrice)
-      seriesB.push(b.merchantPrices.fishPrice, b.merchantPrices.wheatPrice)
+      seriesA.push(a.merchantPrices.cakePrice, a.merchantPrices.goodsPrice)
+      seriesB.push(b.merchantPrices.cakePrice, b.merchantPrices.goodsPrice)
     }
 
     expect(seriesA).not.toEqual(seriesB)

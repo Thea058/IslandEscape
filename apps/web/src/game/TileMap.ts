@@ -1,9 +1,9 @@
 // ============================================================
-// Island Escape — Tile Map Renderer (PixiJS)
+// Kowloon Walled City — Tile Map Renderer (PixiJS)
 // ============================================================
 
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
-import { ISLAND_MAP, TILE_SIZE, MAP_COLS, MAP_ROWS, type TileType } from './tiles'
+import { CITY_MAP, TILE_SIZE, MAP_COLS, MAP_ROWS, type TileType } from './tiles'
 
 // ----- Color Palette -----
 
@@ -11,12 +11,12 @@ const COLORS: Record<TileType, number> = {
   water: 0x2389da,
   sand: 0xe8d5a3,
   grass: 0x5b9a3e,
-  farmland: 0x8b6f3a,
+  dojo: 0x6b6b73,
   dock: 0x8b6b42,
   house: 0xa0522d,
   tree: 0x2d6e1e,
   rock: 0x808080,
-  fishing_spot: 0x1a7ab5,
+  workshop: 0x1a7ab5,
   path: 0xc4a96a,
   cave: 0x1a1a2e,
 }
@@ -24,7 +24,7 @@ const COLORS: Record<TileType, number> = {
 export class TileMap {
   public container: Container
   private waterFrame = 0
-  /** Animated water/fishing tiles — redrawn each frame with shifting waves. */
+  /** Animated water/workshop tiles — redrawn each frame with shifting waves. */
   private waterTiles: Array<{ g: Graphics; type: TileType; col: number; row: number }> = []
 
   constructor() {
@@ -36,7 +36,7 @@ export class TileMap {
   private buildMap() {
     for (let row = 0; row < MAP_ROWS; row++) {
       for (let col = 0; col < MAP_COLS; col++) {
-        const tile = ISLAND_MAP[row]![col]!
+        const tile = CITY_MAP[row]![col]!
         const g = new Graphics()
         g.x = col * TILE_SIZE
         g.y = row * TILE_SIZE
@@ -44,13 +44,13 @@ export class TileMap {
         this.drawTile(g, tile, col, row)
         this.container.addChild(g)
 
-        if (tile === 'water' || tile === 'fishing_spot') {
+        if (tile === 'water' || tile === 'workshop') {
           this.waterTiles.push({ g, type: tile, col, row })
         }
       }
     }
 
-    // Draw merchant ship at dock
+    // Draw the market stall at the dock
     this.drawMerchantShip()
   }
 
@@ -70,8 +70,8 @@ export class TileMap {
         g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(baseColor)
         this.drawGrassBlades(g, col, row)
         break
-      case 'farmland':
-        this.drawFarmland(g)
+      case 'dojo':
+        this.drawDojo(g)
         break
       case 'dock':
         this.drawDock(g)
@@ -88,8 +88,8 @@ export class TileMap {
         g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0x5b9a3e) // grass base
         this.drawRock(g)
         break
-      case 'fishing_spot':
-        this.drawFishingSpot(g)
+      case 'workshop':
+        this.drawWorkshop(g)
         break
       case 'cave':
         g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0x5b9a3e) // grass base
@@ -175,12 +175,14 @@ export class TileMap {
     }
   }
 
-  private drawFarmland(g: Graphics) {
-    g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0x8b6f3a)
-    // Crop rows
+  /** 武馆 — the training hall. Stone floor rather than crops. */
+  private drawDojo(g: Graphics) {
+    g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0x6b6b73)
+    // Flagstones
     for (let i = 0; i < 4; i++) {
       const y = 4 + i * 8
-      g.rect(2, y, TILE_SIZE - 4, 3).fill({ color: 0x6aad3e, alpha: 0.8 })
+      g.rect(2, y, TILE_SIZE - 4, 6).fill({ color: 0x84848c, alpha: 0.9 })
+      g.moveTo(2, y).lineTo(TILE_SIZE - 2, y).stroke({ color: 0x55555c, width: 1, alpha: 0.7 })
     }
   }
 
@@ -224,15 +226,17 @@ export class TileMap {
     g.ellipse(12, 14, 4, 3).fill({ color: 0xaaaaaa, alpha: 0.6 })
   }
 
-  private drawFishingSpot(g: Graphics, phase = 0) {
+  /** 工场 — the workshop on the waterfront, where 打工 happens. */
+  private drawWorkshop(g: Graphics, phase = 0) {
     this.drawWater(g, 0x1a7ab5, phase)
-    // Fish icon with subtle bob from the same phase as the wave
+    // Crate stack, bobbing gently on the same phase as the wave
     const bob = Math.sin(phase * 1.2) * 1.5
-    g.ellipse(16, 16 + bob, 6, 3).fill({ color: 0xffaa44, alpha: 0.8 })
-    g.poly([22, 16 + bob, 26, 12 + bob, 26, 20 + bob]).fill({ color: 0xffaa44, alpha: 0.8 })
-    // Sparkle that pulses
+    g.rect(10, 12 + bob, 12, 12).fill({ color: 0xb07a3a, alpha: 0.9 })
+    g.moveTo(10, 18 + bob).lineTo(22, 18 + bob).stroke({ color: 0x7a5020, width: 1, alpha: 0.9 })
+    g.moveTo(16, 12 + bob).lineTo(16, 24 + bob).stroke({ color: 0x7a5020, width: 1, alpha: 0.9 })
+    // Sparkle that pulses — signals "interactable here"
     const sparkle = 0.3 + (Math.sin(phase * 1.7) * 0.5 + 0.5) * 0.5
-    g.circle(10, 10, 2).fill({ color: 0xffffff, alpha: sparkle })
+    g.circle(8, 9, 2).fill({ color: 0xffe0a0, alpha: sparkle })
   }
 
   private drawCave(g: Graphics) {
@@ -283,7 +287,7 @@ export class TileMap {
       fontWeight: 'bold',
       stroke: { color: 0x000000, width: 2 },
     })
-    const label = new Text({ text: 'SHIP', style })
+    const label = new Text({ text: 'MARKET', style })
     label.anchor.set(0.5, 1)
     label.x = 16
     label.y = -2
@@ -302,7 +306,7 @@ export class TileMap {
       if (type === 'water') {
         this.drawWater(g, COLORS.water, phase)
       } else {
-        this.drawFishingSpot(g, phase)
+        this.drawWorkshop(g, phase)
       }
       // Re-apply the subtle grid line (drawTile adds it; we cleared it above).
       g.rect(0, 0, TILE_SIZE, TILE_SIZE).stroke({ color: 0x000000, alpha: 0.06, width: 0.5 })

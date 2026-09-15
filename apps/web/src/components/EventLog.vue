@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue'
 import { useGameStore, CHARACTER_META } from '@/stores/game'
-import type { GameSSEEvent } from '@game/shared'
+import { LABOR_LABELS, RESOURCE_LABELS, type GameSSEEvent } from '@game/shared'
 
 const game = useGameStore()
 const logContainer = ref<HTMLElement | null>(null)
@@ -29,8 +29,9 @@ function eventToLogEntry(event: GameSSEEvent, index: number): LogEntry | null {
     case 'ai_decision': {
       const meta = CHARACTER_META[event.characterId]
       const decision = event.decision as Record<string, unknown> | undefined
-      const labor = (decision?.labor as Record<string, unknown>)?.labor ?? 'act'
-      return { id, text: `${meta?.name ?? event.characterId} decided to ${labor}`, type: 'ai', colorClass: 'log-ai-bold' }
+      const labor = (decision?.labor as Record<string, unknown>)?.labor as keyof typeof LABOR_LABELS | undefined
+      const label = labor ? LABOR_LABELS[labor] : 'act'
+      return { id, text: `${meta?.name ?? event.characterId} decided on ${label}`, type: 'ai', colorClass: 'log-ai-bold' }
     }
 
     case 'trade_result':
@@ -56,14 +57,14 @@ function eventToLogEntry(event: GameSSEEvent, index: number): LogEntry | null {
 
     case 'escape': {
       const meta = CHARACTER_META[event.characterId]
-      return { id, text: `${meta?.name ?? event.characterId} has escaped the island!`, type: 'escape', colorClass: 'log-escape' }
+      return { id, text: `${meta?.name ?? event.characterId} bought their way out of the walled city!`, type: 'escape', colorClass: 'log-escape' }
     }
 
     case 'game_over':
       return { id, text: `Game Over: ${event.reason}`, type: 'gameover', colorClass: 'log-gameover' }
 
     case 'day_start':
-      return { id, text: `Day ${event.day} begins! Ship prices: Fish=${event.merchantPrices.fishPrice}c Wheat=${event.merchantPrices.wheatPrice}c`, type: 'day', colorClass: 'log-day' }
+      return { id, text: `Day ${event.day} begins! Market rates: ${RESOURCE_LABELS.cake}=${event.merchantPrices.cakePrice}c ${RESOURCE_LABELS.goods}=${event.merchantPrices.goodsPrice}c`, type: 'day', colorClass: 'log-day' }
 
     case 'error':
       return { id, text: `Error: ${event.message}`, type: 'error', colorClass: 'log-error' }

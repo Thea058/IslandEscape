@@ -39,16 +39,17 @@ const WATER_COLOR = 0x1d7ec8
 const WATER_HIGHLIGHT = 0x63c0ff
 const SAND_COLOR = 0xe5d4a1
 const GRASS_COLOR = 0x5f9c4f
-const SOIL_COLOR = 0x8d6640
+const STONE_COLOR = 0x4a4a52
+const STONE_HIGHLIGHT = 0x84848c
 const WOOD_COLOR = 0x7b5130
 const SAIL_COLOR = 0xf2eee3
 const GOLD_COLOR = 0xe7bf57
 const NPC_COLORS: Record<CharacterId, number> = {
   player: 0xd94f41,
-  tom: 0xe08a3c,
-  sam: 0x4590d7,
-  lily: 0x56aa5d,
-  jack: 0x8f54c9,
+  san: 0xe08a3c,
+  shun: 0x4590d7,
+  cyclone: 0x56aa5d,
+  simon: 0x8f54c9,
 }
 
 function makeMaterial(color: number, roughness = 0.68, metalness = 0.08) {
@@ -142,89 +143,79 @@ function createDefaultPreview() {
   return group
 }
 
-function createFishPreview() {
-  const group = createStage(0x195d99, 0x74d0ff)
+/** 工场 — a stack of crates on a flagstone floor. Odd jobs move boxes, they don't catch fish. */
+function createWorkPreview() {
+  const group = createStage(STONE_COLOR, STONE_HIGHLIGHT)
 
-  const waveA = new THREE.Mesh(
-    new THREE.TorusGeometry(0.84, 0.035, 8, 30),
-    new THREE.MeshStandardMaterial({ color: 0x8ad6ff, roughness: 0.25, metalness: 0.05 }),
+  const floor = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.16, 1.15),
+    makeMaterial(0x6b6b73, 0.96, 0.02),
   )
-  waveA.rotation.x = Math.PI / 2
-  addMesh(group, waveA, 0, 0.02, 0)
+  addMesh(group, floor, 0, 0.02, 0)
 
-  const waveB = waveA.clone()
-  waveB.scale.setScalar(0.72)
-  addMesh(group, waveB, 0, 0.08, 0)
+  // Crates stacked two wide and three high, the top one set askew so the pile
+  // reads as "in use" rather than as a shop display.
+  const crate = (x: number, y: number, z: number, size: number, tilt: number) => {
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(size, size, size),
+      makeMaterial(WOOD_COLOR, 0.88, 0.03),
+    )
+    box.rotation.y = tilt
+    addMesh(group, box, x, y, z)
+    const band = new THREE.Mesh(
+      new THREE.BoxGeometry(size * 1.02, size * 0.12, size * 1.02),
+      makeMaterial(0x9a6b3f, 0.8, 0.04),
+    )
+    band.rotation.y = tilt
+    addMesh(group, band, x, y, z)
+  }
 
-  const body = new THREE.Mesh(
-    new THREE.SphereGeometry(0.38, 24, 18),
-    makeMaterial(0xffa85e, 0.45, 0.08),
-  )
-  body.scale.set(1.5, 0.75, 0.72)
-  addMesh(group, body, 0, 0.38, 0)
-
-  const tail = new THREE.Mesh(
-    new THREE.ConeGeometry(0.22, 0.42, 3),
-    makeMaterial(0xff8b43, 0.46, 0.08),
-  )
-  tail.rotation.z = -Math.PI / 2
-  addMesh(group, tail, -0.58, 0.38, 0)
-
-  const finTop = new THREE.Mesh(
-    new THREE.ConeGeometry(0.12, 0.24, 3),
-    makeMaterial(0xffbf74, 0.48, 0.06),
-  )
-  finTop.rotation.x = Math.PI / 2
-  addMesh(group, finTop, 0, 0.62, 0)
-
-  const eye = new THREE.Mesh(
-    new THREE.SphereGeometry(0.04, 10, 10),
-    makeMaterial(0xffffff, 0.3, 0.02),
-  )
-  addMesh(group, eye, 0.38, 0.43, 0.16)
-
-  const pupil = new THREE.Mesh(
-    new THREE.SphereGeometry(0.018, 8, 8),
-    makeMaterial(0x17202b, 0.5, 0.01),
-  )
-  addMesh(group, pupil, 0.41, 0.43, 0.18)
+  crate(-0.34, 0.26, -0.1, 0.44, 0)
+  crate(0.24, 0.26, 0.14, 0.4, 0.3)
+  crate(-0.3, 0.68, -0.08, 0.4, 0.12)
+  crate(0.2, 0.64, 0.12, 0.36, -0.22)
+  crate(-0.08, 1.04, 0.02, 0.34, 0.42)
 
   return group
 }
 
-function createFarmPreview() {
-  const group = createStage(0x73513a, 0xd4af60)
+/** 武馆 — a wooden striking dummy on the hall's flagstones. */
+function createTrainPreview() {
+  const group = createStage(STONE_COLOR, STONE_HIGHLIGHT)
 
-  const plot = new THREE.Mesh(
-    new THREE.BoxGeometry(1.5, 0.18, 1.15),
-    makeMaterial(SOIL_COLOR, 0.94, 0.02),
+  const floor = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.16, 1.15),
+    makeMaterial(0x6b6b73, 0.96, 0.02),
   )
-  addMesh(group, plot, 0, 0.03, 0)
+  addMesh(group, floor, 0, 0.02, 0)
 
-  for (let row = 0; row < 4; row += 1) {
-    const furrow = new THREE.Mesh(
-      new THREE.BoxGeometry(1.25, 0.02, 0.08),
-      makeMaterial(0x5c3d2a, 0.95, 0.01),
-    )
-    addMesh(group, furrow, 0, 0.13, -0.38 + row * 0.25)
-  }
+  const post = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.15, 1.15, 12),
+    makeMaterial(WOOD_COLOR, 0.9, 0.02),
+  )
+  addMesh(group, post, 0, 0.68, 0)
 
-  for (let i = 0; i < 7; i += 1) {
-    const stalk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.018, 0.025, 0.62, 6),
-      makeMaterial(0x8dbd54, 0.76, 0.02),
-    )
-    const x = -0.48 + i * 0.16
-    const z = i % 2 === 0 ? -0.1 : 0.18
-    stalk.rotation.z = i % 2 === 0 ? -0.12 : 0.12
-    addMesh(group, stalk, x, 0.42, z)
+  const arm = new THREE.Mesh(
+    new THREE.BoxGeometry(1.0, 0.13, 0.13),
+    makeMaterial(0x8a5a33, 0.88, 0.02),
+  )
+  addMesh(group, arm, 0, 0.94, 0)
 
-    const grain = new THREE.Mesh(
-      new THREE.ConeGeometry(0.06, 0.24, 6),
-      makeMaterial(GOLD_COLOR, 0.54, 0.05),
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.19, 16, 12),
+    makeMaterial(0x9a6b3f, 0.86, 0.03),
+  )
+  addMesh(group, head, 0, 1.32, 0)
+
+  // Wrapped rope around the post — cheap, but it is what makes the shape read
+  // as a training dummy rather than a fence post.
+  for (let i = 0; i < 3; i += 1) {
+    const wrap = new THREE.Mesh(
+      new THREE.TorusGeometry(0.16, 0.028, 8, 18),
+      makeMaterial(SAIL_COLOR, 0.92, 0.01),
     )
-    grain.rotation.z = stalk.rotation.z
-    addMesh(group, grain, x + (i % 2 === 0 ? -0.04 : 0.04), 0.7, z)
+    wrap.rotation.x = Math.PI / 2
+    addMesh(group, wrap, 0, 0.36 + i * 0.2, 0)
   }
 
   return group
@@ -465,10 +456,10 @@ export function createInteractionPreviewObject(interaction: InteractionType): Pr
   if (!interaction) return createDefaultPreview()
 
   switch (interaction.kind) {
-    case 'fish':
-      return createFishPreview()
-    case 'farm':
-      return createFarmPreview()
+    case 'work':
+      return createWorkPreview()
+    case 'train':
+      return createTrainPreview()
     case 'merchant':
       return createMerchantPreview()
     case 'dungeon':

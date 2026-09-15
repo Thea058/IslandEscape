@@ -1,75 +1,71 @@
 import {
   type GameState,
   type CharacterId,
+  type AICharacterId,
   type AIDecision,
   type AILaborDecision,
   type AITradeDecision,
   AI_CHARACTERS,
   friendshipKey,
   GAME_CONFIG,
+  RESOURCE_LABELS,
+  LABOR_LABELS,
 } from '@game/shared'
-import { getPersonality } from './personalities'
+import { getPersonality, llmFacingName } from './personalities'
+import { formatResources } from './format'
 import { chatJSON } from './llm'
 
-function buildGameContext(state: GameState, charId: CharacterId): string {
+function buildGameContext(state: GameState, charId: AICharacterId): string {
   const me = state.characters[charId]
   if (!me) return 'You are eliminated.'
 
   const lines: string[] = []
   lines.push(`Day ${state.day}. You are ${getPersonality(charId).name}.`)
-  lines.push(`Your resources: fish=${me.resources.fish}, wheat=${me.resources.wheat}, coins=${me.resources.coins}`)
+  lines.push(`Your resources: ${formatResources(me.resources)}`)
   lines.push(`Trade slots remaining today: ${me.tradeSlots}`)
-  lines.push(`Merchant ship prices today: fish=${state.merchantPrices.fishPrice} coins each, wheat=${state.merchantPrices.wheatPrice} coins each`)
+  lines.push(`Market rates today: ${RESOURCE_LABELS.cake}=${state.merchantPrices.cakePrice} coins each, ${RESOURCE_LABELS.goods}=${state.merchantPrices.goodsPrice} coins each`)
   lines.push('')
 
-  const myHarvests = state.pendingHarvests.filter(h => h.characterId === charId)
-  if (myHarvests.length > 0) {
-    lines.push('Your pending harvests:')
-    for (const h of myHarvests) {
-      lines.push(`  - wheat +${h.amount} arriving on day ${h.harvestOnDay}`)
-    }
-    lines.push('')
-  }
-
-  lines.push('Other characters on the island:')
+  lines.push('Other characters in the walled city (id in brackets — use the id when you act):')
   for (const otherId of [...AI_CHARACTERS, 'player' as CharacterId]) {
     if (otherId === charId) continue
     const other = state.characters[otherId]
+    const label = `${llmFacingName(otherId)} [${otherId}]`
     if (!other || !other.alive || other.escaped) {
-      if (other?.escaped) lines.push(`  - ${otherId}: ESCAPED`)
-      else if (other && !other.alive) lines.push(`  - ${otherId}: ELIMINATED`)
+      if (other?.escaped) lines.push(`  - ${label}: ESCAPED`)
+      else if (other && !other.alive) lines.push(`  - ${label}: ELIMINATED`)
       continue
     }
     const fKey = friendshipKey(charId, otherId)
     const friendship = state.friendship[fKey] || 0
-    lines.push(`  - ${otherId}: fish=${other.resources.fish}, wheat=${other.resources.wheat}, coins=${other.resources.coins} (friendship: ${friendship})`)
+    lines.push(`  - ${label}: ${formatResources(other.resources)} (friendship: ${friendship})`)
   }
 
   lines.push('')
-  lines.push(`Goal: reach ${GAME_CONFIG.WIN_COINS} coins to escape the island.`)
-  lines.push('Every night you consume 1 fish and 1 wheat. If either hits 0, you are eliminated.')
+  lines.push(`Goal: reach ${GAME_CONFIG.WIN_COINS} coins to buy your way out of the walled city.`)
+  lines.push(`Every night you eat 1 ${RESOURCE_LABELS.cake}. If you have none left, you starve.`)
 
   return lines.join('\n')
 }
 
-const FULL_DECISION_PROMPT = `You are an AI character in a survival trading game called Island Escape.
+const FULL_DECISION_PROMPT = `You are an AI character in a survival trading game called Kowloon Walled City.
 Each turn you MUST do two things in order:
-1. LABOR: choose either "fish" (+3 fish instantly) or "farm" (plant wheat, +8 wheat in 3 days)
-2. TRADE: you have 2 trade slots. For each slot, choose to trade with the merchant ship, negotiate with another character, or skip.
+1. LABOR: choose either "work" (${LABOR_LABELS.work} — +${GAME_CONFIG.CAKE_PER_WORK} ${RESOURCE_LABELS.cake} and +${GAME_CONFIG.GOODS_PER_WORK} ${RESOURCE_LABELS.goods} instantly) or "train" (${LABOR_LABELS.train} — +${GAME_CONFIG.MIGHT_PER_TRAINING} ${RESOURCE_LABELS.might} instantly)
+2. TRADE: you have 2 trade slots. For each slot, choose to trade with the merchant, negotiate with another character, or skip.
 
 {PERSONALITY}
 
 Respond with a JSON object. Keep every "reasoning" field to ONE short sentence (max ~15 words) — long reasoning will get truncated and break the response.
 {
   "labor": {
-    "labor": "fish" or "farm",
+    "labor": "work" or "train",
     "reasoning": "short reason"
   },
   "trades": [
     {
       "action": "trade_merchant" or "trade_peer" or "skip",
-      "merchantSell": { "fish": 0, "wheat": 0 },
-      "tradeTarget": "character_id",
+      "merchantSell": { "cake": 0, "goods": 0 },
+      "tradeTarget": "the target's id (the value in brackets), e.g. \\"shun\\"",
       "reasoning": "short reason"
     },
     {
@@ -79,19 +75,23 @@ Respond with a JSON object. Keep every "reasoning" field to ONE short sentence (
   ]
 }
 
+The keys "cake", "goods", "coins", "might" are always the exact keys in your JSON — never write the display names you see in the text.
+
 Rules:
-- LABOR is mandatory. You must choose fish or farm.
+- LABOR is mandatory. You must choose work or train.
+- "tradeTarget" MUST be the id in brackets from the character list (e.g. "shun"), never the display name.
 - TRADES array should have exactly 2 entries (one per trade slot).
 - You can only sell resources you actually have.
-- Don't sell so much that you'll die tonight (keep at least 2 fish and 2 wheat after all trades).
+- Don't sell so much that you'll starve tonight (keep at least 2 cake after all trades).
+- "might" is a personal stat, not merchandise — it can never appear in merchantSell or a peer offer.
 - Consider friendship, market prices, who has what you need.
-- If someone is close to escaping (high coins), you might want to avoid helping them.
+- If someone is close to buying their way out (high coins), you might want to avoid helping them.
 - High friendship means better deals and more trust.
 - Keep reasoning terse — one short sentence each, no flowery prose.`
 
 export async function getAIDecision(
   state: GameState,
-  charId: CharacterId,
+  charId: AICharacterId,
 ): Promise<AIDecision> {
   const personality = getPersonality(charId)
   const context = buildGameContext(state, charId)
@@ -100,10 +100,11 @@ export async function getAIDecision(
   try {
     const raw = await chatJSON<Record<string, unknown>>(systemPrompt, context)
 
-    // Parse labor
+    // Parse labor. Anything that isn't exactly "train" falls back to "work" —
+    // an unrecognised value from the model must never cost a character its life.
     const laborRaw = raw.labor as Record<string, unknown> | undefined
     const labor: AILaborDecision = {
-      labor: (laborRaw?.labor === 'farm' ? 'farm' : 'fish') as 'fish' | 'farm',
+      labor: laborRaw?.labor === 'train' ? 'train' : 'work',
       reasoning: (laborRaw?.reasoning as string) || 'AI decided.',
     }
 
@@ -114,7 +115,7 @@ export async function getAIDecision(
       if (action === 'trade_merchant') {
         return {
           action: 'trade_merchant' as const,
-          merchantSell: t.merchantSell as { fish: number; wheat: number } | undefined,
+          merchantSell: t.merchantSell as { cake: number; goods: number } | undefined,
           reasoning: (t.reasoning as string) || '',
         }
       }
@@ -140,7 +141,7 @@ export async function getAIDecision(
   } catch (err) {
     console.error(`AI decision failed for ${charId}:`, err)
     return {
-      labor: { labor: 'fish', reasoning: 'Error fallback: fishing.' },
+      labor: { labor: 'work', reasoning: 'Error fallback: working.' },
       trades: [
         { action: 'skip', reasoning: 'Error fallback.' },
         { action: 'skip', reasoning: 'Error fallback.' },

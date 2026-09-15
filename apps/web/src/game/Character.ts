@@ -1,17 +1,20 @@
 // ============================================================
-// Island Escape — Character Sprite (PixiJS)
+// Kowloon Walled City — Character Sprite (PixiJS)
 // ============================================================
 
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
+import type { CharacterId } from '@game/shared'
 import { TILE_SIZE, type MapPosition, getTile, isWalkable } from './tiles'
 
-// Character colors by ID
-const SHIRT_COLORS: Record<string, number> = {
-  player: 0xdd3333,  // red
-  tom: 0xe88834,     // orange
-  sam: 0x3388cc,     // blue
-  lily: 0x44aa55,    // green
-  jack: 0x8844aa,    // purple
+// Character colors by ID.
+// Keyed by CharacterId rather than `string` so a stale id fails the build
+// instead of silently falling back to grey for every NPC.
+const SHIRT_COLORS: Record<CharacterId, number> = {
+  player: 0xdd3333,   // red
+  san: 0xe88834,      // orange
+  shun: 0x3388cc,     // blue
+  cyclone: 0x44aa55,  // green
+  simon: 0x8844aa,    // purple
 }
 
 const SKIN_COLOR = 0xf0c8a0
@@ -19,7 +22,7 @@ const HAIR_COLOR = 0x4a3520
 const PANTS_COLOR = 0x334455
 
 export interface CharacterConfig {
-  id: string
+  id: CharacterId
   name: string
   col: number
   row: number
@@ -28,7 +31,7 @@ export interface CharacterConfig {
 export class Character {
   public container: Container
   public overlayContainer: Container
-  public id: string
+  public id: CharacterId
   public name: string
 
   // Grid position
@@ -126,7 +129,7 @@ export class Character {
     const g = this.sprite
     g.clear()
 
-    const shirtColor = SHIRT_COLORS[this.id] ?? 0xaaaaaa
+    const shirtColor = SHIRT_COLORS[this.id]
     const cx = TILE_SIZE / 2 + this.idleSwayX  // center x with idle horizontal sway
     const bob = Math.round(this.bobOffset)
 

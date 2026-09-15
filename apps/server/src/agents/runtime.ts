@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto'
 import type {
   GameState,
   CharacterId,
+  AICharacterId,
   GameSSEEvent,
   NegotiationMessage,
 } from '@game/shared'
-import { GAME_CONFIG } from '@game/shared'
+import { GAME_CONFIG, LABOR_LABELS } from '@game/shared'
 import { getAIDecision } from './decision-agent'
+import { displayNameForPlayer as nameOf } from './personalities'
 import { getNegotiationReply, getAITradeInitiation } from './negotiation-agent'
 import { negotiations, sessions } from '../state'
 import {
@@ -43,7 +45,7 @@ export async function runAITurns(
     }
 
     broadcast({ type: 'ai_thinking', characterId: charId })
-    broadcast({ type: 'log', message: `${charId}'s turn...` })
+    broadcast({ type: 'log', message: `${nameOf(charId)}'s turn...` })
 
     try {
       // Get full decision: labor + trades
@@ -54,7 +56,9 @@ export async function runAITurns(
       broadcast({ type: 'ai_decision', characterId: charId, decision })
 
       // Step 1: Labor (mandatory)
-      broadcast({ type: 'log', message: `${charId} chose to ${decision.labor.labor}. (${decision.labor.reasoning})` })
+      // LABOR_LABELS, not the raw id — the player reads "chose odd jobs", not
+      // "chose work". Same registry the engine logs with.
+      broadcast({ type: 'log', message: `${nameOf(charId)} chose ${LABOR_LABELS[decision.labor.labor]}. (${decision.labor.reasoning})` })
       // Give the client a beat to start the walk animation before HUD numbers change.
       await delay(400)
       current = applyAILabor(current, charId, decision.labor.labor)
@@ -77,12 +81,12 @@ export async function runAITurns(
         await delay(300)
 
         if (trade.action === 'trade_merchant' && trade.merchantSell) {
-          broadcast({ type: 'log', message: `${charId} trades with merchant. (${trade.reasoning})` })
+          broadcast({ type: 'log', message: `${nameOf(charId)} trades at the night market. (${trade.reasoning})` })
           current = applyAITrade(current, charId, trade)
         }
 
         if (trade.action === 'trade_peer' && trade.tradeTarget) {
-          broadcast({ type: 'log', message: `${charId} wants to trade with ${trade.tradeTarget}. (${trade.reasoning})` })
+          broadcast({ type: 'log', message: `${nameOf(charId)} wants to trade with ${nameOf(trade.tradeTarget)}. (${trade.reasoning})` })
           if (trade.tradeTarget === 'player') {
             // Special-case: NPC initiates with the human player. Don't run the
             // LLM-vs-LLM auto-loop (it would call getPersonality('player') and
@@ -101,9 +105,9 @@ export async function runAITurns(
 
     } catch (err) {
       console.error(`AI turn failed for ${charId}:`, err)
-      // Fallback: just fish
-      current = applyAILabor(current, charId, 'fish')
-      broadcast({ type: 'log', message: `${charId} went fishing (error fallback).` })
+      // Fallback: the safest action — 打工 always yields food.
+      current = applyAILabor(current, charId, 'work')
+      broadcast({ type: 'log', message: `${nameOf(charId)} worked (error fallback).` })
     }
 
     broadcast({ type: 'state_update', state: current })
@@ -132,7 +136,7 @@ export async function runAITurns(
     broadcast({
       type: 'game_over',
       winnerId: current.winnerId,
-      reason: current.winnerId ? `${current.winnerId} escaped the island!` : 'All hope is lost.',
+      reason: current.winnerId ? `${nameOf(current.winnerId)} bought their way out!` : 'All hope is lost.',
     })
     return current
   }
@@ -144,10 +148,11 @@ export async function runAITurns(
   return current
 }
 
+/** AI-vs-AI talks only — the player path is `initiatePlayerNegotiation` below. */
 async function runAINegotiation(
   current: GameState,
-  initiator: CharacterId,
-  target: CharacterId,
+  initiator: AICharacterId,
+  target: AICharacterId,
   broadcast: SSEBroadcaster,
 ): Promise<GameState> {
   const targetChar = current.characters[target]
@@ -194,12 +199,12 @@ async function runAINegotiation(
     const lastProposal = [...history].reverse().find(m => m.proposal)?.proposal
     if (lastProposal) {
       const newState = executePeerTrade(current, lastProposal.from, lastProposal.to, lastProposal.offer, lastProposal.request)
-      broadcast({ type: 'trade_result', success: true, from: lastProposal.from, to: lastProposal.to, summary: `Trade completed between ${lastProposal.from} and ${lastProposal.to}` })
+      broadcast({ type: 'trade_result', success: true, from: lastProposal.from, to: lastProposal.to, summary: `Trade completed between ${nameOf(lastProposal.from)} and ${nameOf(lastProposal.to)}` })
       return newState
     }
   }
 
-  broadcast({ type: 'trade_result', success: false, from: initiator, to: target, summary: `Negotiation between ${initiator} and ${target} failed.` })
+  broadcast({ type: 'trade_result', success: false, from: initiator, to: target, summary: `Negotiation between ${nameOf(initiator)} and ${nameOf(target)} failed.` })
   return current
 }
 
@@ -215,7 +220,7 @@ async function runAINegotiation(
  */
 async function initiatePlayerNegotiation(
   current: GameState,
-  initiator: CharacterId,
+  initiator: AICharacterId,
   broadcast: SSEBroadcaster,
   gameId: string,
 ): Promise<GameState> {
@@ -263,7 +268,7 @@ async function initiatePlayerNegotiation(
   broadcast({ type: 'negotiation', message: openingMsg })
   broadcast({
     type: 'log',
-    message: `${initiator} is waiting for your response...`,
+    message: `${nameOf(initiator)} is waiting for your response...`,
   })
 
   // === Block until the player resolves or we time out ===
@@ -277,9 +282,9 @@ async function initiatePlayerNegotiation(
         success: false,
         from: initiator,
         to: 'player',
-        summary: `${initiator} got tired of waiting and walked away.`,
+        summary: `${nameOf(initiator)} got tired of waiting and walked away.`,
       })
-      broadcast({ type: 'log', message: `${initiator} walked away (timed out).` })
+      broadcast({ type: 'log', message: `${nameOf(initiator)} walked away (timed out).` })
       break
     }
     await delay(PLAYER_RESPONSE_POLL_MS)

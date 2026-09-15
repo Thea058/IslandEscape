@@ -1,5 +1,5 @@
 // ============================================================
-// Island Escape — Game Renderer (PixiJS Application)
+// Kowloon Walled City — Game Renderer (PixiJS Application)
 // ============================================================
 
 import { Application } from 'pixi.js'

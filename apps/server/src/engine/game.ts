@@ -8,13 +8,20 @@ import {
   type MerchantPrices,
   type DungeonResult,
   type Resources,
+  type TradeOffer,
   type DailyEvent,
   ALL_CHARACTERS,
   AI_CHARACTERS,
   GAME_CONFIG,
+  RESOURCE_LABELS,
+  LABOR_LABELS,
   friendshipKey,
   mulberry32,
 } from '@game/shared'
+// Log lines are read by the human player, so they name characters the way the
+// player sees them (辛仔, You) rather than by machine id (san). The engine's
+// internal keys stay untouched by this — only the strings it writes out change.
+import { displayNameForPlayer as nameOf } from '../agents/personalities'
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -34,8 +41,9 @@ function safeNum(v: unknown, fallback = 0): number {
 
 function safeResources(r: Partial<Resources> | undefined | null): Resources {
   return {
-    fish: safeNum(r?.fish),
-    wheat: safeNum(r?.wheat),
+    cake: safeNum(r?.cake),
+    goods: safeNum(r?.goods),
+    might: safeNum(r?.might),
     coins: safeNum(r?.coins),
   }
 }
@@ -71,16 +79,16 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 function generateMerchantPrices(): MerchantPrices {
   return {
-    fishPrice: randInt(GAME_CONFIG.MERCHANT_FISH_PRICE_RANGE[0], GAME_CONFIG.MERCHANT_FISH_PRICE_RANGE[1]),
-    wheatPrice: randInt(GAME_CONFIG.MERCHANT_WHEAT_PRICE_RANGE[0], GAME_CONFIG.MERCHANT_WHEAT_PRICE_RANGE[1]),
+    cakePrice: randInt(GAME_CONFIG.MERCHANT_CAKE_PRICE_RANGE[0], GAME_CONFIG.MERCHANT_CAKE_PRICE_RANGE[1]),
+    goodsPrice: randInt(GAME_CONFIG.MERCHANT_GOODS_PRICE_RANGE[0], GAME_CONFIG.MERCHANT_GOODS_PRICE_RANGE[1]),
   }
 }
 
 /**
  * Roll a fresh daily event. Roughly a third of days have a non-trivial twist.
  * Calm days dominate the early game so new players have time to learn the
- * basics; drought (the most punishing event) is suppressed for the first
- * few days because new players don't yet have wheat buffers.
+ * basics; famine (the most punishing event) is suppressed for the first
+ * few days because new players don't yet have cake buffers.
  */
 function rollDailyEvent(day: number): DailyEvent {
   // Day 1-2 are always calm so first-time players can find their feet.
@@ -89,20 +97,21 @@ function rollDailyEvent(day: number): DailyEvent {
   if (r < 0.65) return 'none'
   if (r < 0.73) return 'storm'
   if (r < 0.81) return 'festival'
-  if (r < 0.88) return 'lucky_catch'
-  if (r < 0.95) return 'bumper_crop'
-  // Drought is the deadliest event — only allow it once players have a couple
-  // of harvest cycles under their belt (Day 4+).
-  if (day < 4) return 'bumper_crop'
-  return 'drought'
+  if (r < 0.88) return 'windfall'
+  if (r < 0.95) return 'cargo_spill'
+  // Famine is the deadliest event — only allow it once players have a couple
+  // of days of cake stockpiled (Day 4+).
+  if (day < 4) return 'cargo_spill'
+  return 'famine'
 }
 
 function makeCharacter(id: CharacterId): CharacterState {
   return {
     id,
     resources: {
-      fish: GAME_CONFIG.STARTING_FISH,
-      wheat: GAME_CONFIG.STARTING_WHEAT,
+      cake: GAME_CONFIG.STARTING_CAKE,
+      goods: GAME_CONFIG.STARTING_GOODS,
+      might: GAME_CONFIG.STARTING_MIGHT,
       coins: GAME_CONFIG.STARTING_COINS,
     },
     tradeSlots: GAME_CONFIG.TRADE_SLOTS_PER_DAY,
@@ -134,7 +143,6 @@ export function createNewGame(gameId: string, seed?: number | null): GameState {
     characters,
     friendship,
     merchantPrices: generateMerchantPrices(),
-    pendingHarvests: [],
     log: [],
     eliminatedIds: [],
     escapedIds: [],
@@ -164,44 +172,26 @@ export function startDay(state: GameState): GameState {
     }
   }
 
-  // Lucky Catch event — every alive character receives +2 fish at dawn.
-  if (dailyEvent === 'lucky_catch') {
+  // Windfall event — every alive character receives +2 光酥饼 at dawn.
+  if (dailyEvent === 'windfall') {
     for (const id of ALL_CHARACTERS) {
       const c = characters[id]
       if (c && c.alive && !c.escaped) {
         const res = safeResources(c.resources)
-        characters[id] = { ...c, resources: { ...res, fish: res.fish + 2 } }
+        characters[id] = { ...c, resources: { ...res, cake: res.cake + 2 } }
       }
     }
   }
 
-  // Bumper Crop event — the farming counterpart of Lucky Catch: every alive
-  // character receives +2 wheat at dawn.
-  if (dailyEvent === 'bumper_crop') {
+  // Cargo Spill event — the goods counterpart of Windfall: every alive
+  // character receives +2 货物 at dawn.
+  if (dailyEvent === 'cargo_spill') {
     for (const id of ALL_CHARACTERS) {
       const c = characters[id]
       if (c && c.alive && !c.escaped) {
         const res = safeResources(c.resources)
-        characters[id] = { ...c, resources: { ...res, wheat: res.wheat + 2 } }
+        characters[id] = { ...c, resources: { ...res, goods: res.goods + 2 } }
       }
-    }
-  }
-
-  // Deliver pending harvests
-  const remainingHarvests = []
-  const harvestLog: string[] = []
-  for (const h of state.pendingHarvests) {
-    if (h.harvestOnDay <= state.day) {
-      const c = characters[h.characterId]
-      if (c && c.alive && !c.escaped) {
-        characters[h.characterId] = {
-          ...c,
-          resources: { ...c.resources, wheat: c.resources.wheat + h.amount },
-        }
-        harvestLog.push(`${h.characterId} harvested +${h.amount} wheat.`)
-      }
-    } else {
-      remainingHarvests.push(h)
     }
   }
 
@@ -212,17 +202,16 @@ export function startDay(state: GameState): GameState {
   const aiTurnOrder = shuffleArray(aliveAI)
 
   const eventLogLines: string[] = []
-  if (dailyEvent === 'storm') eventLogLines.push('⛈️ Storm — fishing yields only 1 fish today.')
+  if (dailyEvent === 'storm') eventLogLines.push(`⛈️ Downpour — ${LABOR_LABELS.work} yields only 1 ${RESOURCE_LABELS.goods} today.`)
   else if (dailyEvent === 'festival') eventLogLines.push('🎉 Festival — friendship gains doubled today.')
-  else if (dailyEvent === 'lucky_catch') eventLogLines.push('🎣 Lucky Catch — everyone alive received +2 fish at dawn.')
-  else if (dailyEvent === 'bumper_crop') eventLogLines.push('🌾 Bumper Crop — everyone alive received +2 wheat at dawn.')
-  else if (dailyEvent === 'drought') eventLogLines.push('🏜️ Drought — tonight\'s upkeep costs 2 wheat.')
+  else if (dailyEvent === 'windfall') eventLogLines.push(`🥮 Windfall — everyone alive received +2 ${RESOURCE_LABELS.cake} at dawn.`)
+  else if (dailyEvent === 'cargo_spill') eventLogLines.push(`📦 Cargo Spill — everyone alive received +2 ${RESOURCE_LABELS.goods} at dawn.`)
+  else if (dailyEvent === 'famine') eventLogLines.push(`🏜️ Famine — tonight's upkeep costs 2 ${RESOURCE_LABELS.cake}.`)
 
   return {
     ...state,
     characters,
     merchantPrices,
-    pendingHarvests: remainingHarvests,
     phase: 'player_labor',  // Player must labor first
     aiTurnOrder,
     currentAiIndex: 0,
@@ -231,9 +220,8 @@ export function startDay(state: GameState): GameState {
     dailyEvent,
     log: [
       `--- Day ${state.day} ---`,
-      `Merchant ship: fish ${merchantPrices.fishPrice}c, wheat ${merchantPrices.wheatPrice}c`,
+      `Market rates: ${RESOURCE_LABELS.cake} ${merchantPrices.cakePrice}c, ${RESOURCE_LABELS.goods} ${merchantPrices.goodsPrice}c`,
       ...eventLogLines,
-      ...harvestLog,
     ],
     updatedAt: nowIso(),
   }
@@ -247,17 +235,17 @@ export function applyPlayerAction(state: GameState, action: PlayerAction): GameS
     throw new Error('Player is not active')
   }
 
-  // Phase: player_labor — must fish or farm
+  // Phase: player_labor — must 打工 (work) or 学武 (train)
   if (state.phase === 'player_labor') {
-    if (action.type === 'fish') {
-      const newState = applyFish(state, 'player')
+    if (action.type === 'work') {
+      const newState = applyWork(state, 'player')
       return { ...newState, phase: 'player_trade', updatedAt: nowIso() }
     }
-    if (action.type === 'farm') {
-      const newState = applyFarm(state, 'player')
+    if (action.type === 'train') {
+      const newState = applyTrain(state, 'player')
       return { ...newState, phase: 'player_trade', updatedAt: nowIso() }
     }
-    throw new Error('During labor phase, you must fish or farm.')
+    throw new Error('During labor phase, you must work or train.')
   }
 
   // Phase: player_trade — use trade slots or end turn
@@ -287,11 +275,11 @@ export function applyPlayerAction(state: GameState, action: PlayerAction): GameS
 
 // ---- AI decision (labor + trades) ----
 
-export function applyAILabor(state: GameState, charId: CharacterId, labor: 'fish' | 'farm'): GameState {
-  if (labor === 'fish') {
-    return applyFish(state, charId)
+export function applyAILabor(state: GameState, charId: CharacterId, labor: 'work' | 'train'): GameState {
+  if (labor === 'work') {
+    return applyWork(state, charId)
   }
-  return applyFarm(state, charId)
+  return applyTrain(state, charId)
 }
 
 export function applyAITrade(state: GameState, charId: CharacterId, trade: AITradeDecision): GameState {
@@ -354,37 +342,37 @@ export function settle(state: GameState): GameState {
     if (safeRes.coins >= GAME_CONFIG.WIN_COINS) {
       characters[id] = { ...safeChar, escaped: true }
       escapedIds.push(id)
-      log.push(`${id} reached ${safeRes.coins} coins and escaped the island!`)
+      log.push(`${nameOf(id)} reached ${safeRes.coins} ${RESOURCE_LABELS.coins} and bought their way out!`)
       if (id === 'player' && !winnerId) {
         winnerId = id
       }
       continue
     }
 
-    // Consume daily resources — drought event doubles the wheat cost.
-    const wheatCost = state.dailyEvent === 'drought'
-      ? GAME_CONFIG.DAILY_WHEAT_COST * 2
-      : GAME_CONFIG.DAILY_WHEAT_COST
-    const newFish = safeRes.fish - GAME_CONFIG.DAILY_FISH_COST
-    const newWheat = safeRes.wheat - wheatCost
+    // Consume the nightly cake — the famine event doubles it. 货物 are a trade
+    // commodity, not food, so they are never eaten.
+    const cakeCost = state.dailyEvent === 'famine'
+      ? GAME_CONFIG.DAILY_CAKE_COST * 2
+      : GAME_CONFIG.DAILY_CAKE_COST
+    const newCake = safeRes.cake - cakeCost
 
-    if (newFish <= 0 || newWheat <= 0) {
+    if (newCake <= 0) {
       characters[id] = {
         ...safeChar,
-        resources: { ...safeRes, fish: newFish, wheat: newWheat },
+        resources: { ...safeRes, cake: newCake },
         alive: false,
       }
       eliminatedIds.push(id)
-      const reasons = []
-      if (newFish <= 0) reasons.push('fish')
-      if (newWheat <= 0) reasons.push('wheat')
-      log.push(`${id} was eliminated (${reasons.join(' and ')} depleted).`)
+      log.push(`${nameOf(id)} starved to death.`)
     } else {
       characters[id] = {
         ...safeChar,
-        resources: { ...safeRes, fish: newFish, wheat: newWheat },
+        resources: { ...safeRes, cake: newCake },
       }
-      log.push(`${id}: fish ${newFish}, wheat ${newWheat}, coins ${safeRes.coins}`)
+      log.push(
+        `${nameOf(id)}: ${RESOURCE_LABELS.cake} ${newCake}, ${RESOURCE_LABELS.goods} ${safeRes.goods}, ` +
+        `${RESOURCE_LABELS.might} ${safeRes.might}, ${RESOURCE_LABELS.coins} ${safeRes.coins}`,
+      )
     }
   }
 
@@ -450,27 +438,30 @@ export function resolveDungeon(state: GameState, result: DungeonResult): GameSta
       ...newState,
       characters: { ...newState.characters, player: updatedPlayer },
     }
-    newState = addLog(newState, `Player defeated the boss! +${coinReward} coins.`)
+    newState = addLog(newState, `${nameOf('player')} defeated 噬影! +${coinReward} ${RESOURCE_LABELS.coins}.`)
   } else {
-    // Losing the dungeon used to be an instant kill on early days (lose 5 fish
-    // and 5 wheat from a starting pool of 6). Cap the loss so the player keeps
-    // at least 1 of each, ensuring they can still survive the upcoming
-    // settlement that costs 1 fish + 1 wheat.
-    const fishLoss = Math.min(Math.max(0, player.resources.fish - 1), GAME_CONFIG.DUNGEON_RESOURCE_PENALTY)
-    const wheatLoss = Math.min(Math.max(0, player.resources.wheat - 1), GAME_CONFIG.DUNGEON_RESOURCE_PENALTY)
+    // Losing the dungeon used to be an instant kill on early days (lose 5 of a
+    // resource from a starting pool of 6). Cap the loss so the player keeps at
+    // least 1 of each, ensuring they can still survive the upcoming settlement
+    // that costs 1 光酥饼.
+    const cakeLoss = Math.min(Math.max(0, player.resources.cake - 1), GAME_CONFIG.DUNGEON_RESOURCE_PENALTY)
+    const goodsLoss = Math.min(Math.max(0, player.resources.goods - 1), GAME_CONFIG.DUNGEON_RESOURCE_PENALTY)
     const updatedPlayer = {
       ...player,
       resources: {
         ...player.resources,
-        fish: player.resources.fish - fishLoss,
-        wheat: player.resources.wheat - wheatLoss,
+        cake: player.resources.cake - cakeLoss,
+        goods: player.resources.goods - goodsLoss,
       },
     }
     newState = {
       ...newState,
       characters: { ...newState.characters, player: updatedPlayer },
     }
-    newState = addLog(newState, `Player was defeated! Lost ${fishLoss} fish and ${wheatLoss} wheat.`)
+    newState = addLog(
+      newState,
+      `${nameOf('player')} was defeated! Lost ${cakeLoss} ${RESOURCE_LABELS.cake} and ${goodsLoss} ${RESOURCE_LABELS.goods}.`,
+    )
   }
 
   return newState
@@ -493,79 +484,103 @@ export function advanceDay(state: GameState): GameState {
 
 // ---- Helpers ----
 
-export function applyFish(state: GameState, charId: CharacterId): GameState {
+/**
+ * 打工 — the survival action. Yields both food and something to sell, which is
+ * what makes it the safe default: you can never work yourself into starvation,
+ * only into a slow grind.
+ */
+export function applyWork(state: GameState, charId: CharacterId): GameState {
   const c = state.characters[charId]
   if (!c) return state
 
   const res = safeResources(c.resources)
-  // Storm: fishing yields cut in half (rounded up) — painful but not deadly.
-  const yieldFish = state.dailyEvent === 'storm' ? 2 : GAME_CONFIG.FISH_PER_LABOR
+  // Downpour halves the goods haul. Cake is deliberately left alone — cutting
+  // both at once would turn one bad roll into a death sentence.
+  const yieldGoods = state.dailyEvent === 'storm'
+    ? Math.max(1, Math.floor(GAME_CONFIG.GOODS_PER_WORK / 2))
+    : GAME_CONFIG.GOODS_PER_WORK
   const newState = updateCharacter(state, charId, {
-    resources: { ...res, fish: res.fish + yieldFish },
+    resources: {
+      ...res,
+      cake: res.cake + GAME_CONFIG.CAKE_PER_WORK,
+      goods: res.goods + yieldGoods,
+    },
   })
-  const note = state.dailyEvent === 'storm' ? ' (storm — only +2)' : ''
-  return addLog(newState, `${charId} went fishing. +${yieldFish} fish${note}.`)
+  const note = state.dailyEvent === 'storm' ? ` (downpour — only +${yieldGoods} ${RESOURCE_LABELS.goods})` : ''
+  return addLog(
+    newState,
+    `${nameOf(charId)} chose ${LABOR_LABELS.work}: +${GAME_CONFIG.CAKE_PER_WORK} ${RESOURCE_LABELS.cake}, ` +
+    `+${yieldGoods} ${RESOURCE_LABELS.goods}${note}.`,
+  )
 }
 
-export function applyFarm(state: GameState, charId: CharacterId): GameState {
-  const harvest = {
-    characterId: charId,
-    plantedOnDay: state.day,
-    harvestOnDay: state.day + GAME_CONFIG.HARVEST_DELAY_DAYS,
-    amount: GAME_CONFIG.WHEAT_PER_HARVEST,
-  }
-  const newState = {
-    ...state,
-    pendingHarvests: [...state.pendingHarvests, harvest],
-  }
-  return addLog(newState, `${charId} planted wheat. Harvest on day ${harvest.harvestOnDay}.`)
+/**
+ * 学武 — the investment action. Yields nothing you can eat today, but 武力 is
+ * what stage C will spend on forcing a trade through.
+ */
+export function applyTrain(state: GameState, charId: CharacterId): GameState {
+  const c = state.characters[charId]
+  if (!c) return state
+
+  const res = safeResources(c.resources)
+  const newState = updateCharacter(state, charId, {
+    resources: { ...res, might: res.might + GAME_CONFIG.MIGHT_PER_TRAINING },
+  })
+  return addLog(
+    newState,
+    `${nameOf(charId)} chose ${LABOR_LABELS.train}: +${GAME_CONFIG.MIGHT_PER_TRAINING} ${RESOURCE_LABELS.might}.`,
+  )
 }
 
 export function applyMerchantTrade(
   state: GameState,
   charId: CharacterId,
-  sell: { fish: number; wheat: number },
+  sell: { cake: number; goods: number },
 ): GameState {
   const c = state.characters[charId]
   if (!c) return state
   if (c.tradeSlots <= 0) {
-    return addLog(state, `${charId} has no trade slots remaining.`)
+    return addLog(state, `${nameOf(charId)} has no trade slots remaining.`)
   }
   // Coerce: AI decision JSON occasionally arrives with null/undefined fields.
   const res = safeResources(c.resources)
-  const sellFish = safeNum(sell.fish)
-  const sellWheat = safeNum(sell.wheat)
-  if (sellFish > res.fish || sellWheat > res.wheat) {
-    return addLog(state, `${charId} does not have enough resources to sell.`)
+  const sellCake = safeNum(sell.cake)
+  const sellGoods = safeNum(sell.goods)
+  if (sellCake > res.cake || sellGoods > res.goods) {
+    return addLog(state, `${nameOf(charId)} does not have enough resources to sell.`)
   }
-  if (sellFish === 0 && sellWheat === 0) {
-    return addLog(state, `${charId} tried to sell nothing to the merchant.`)
+  if (sellCake === 0 && sellGoods === 0) {
+    return addLog(state, `${nameOf(charId)} tried to sell nothing to the merchant.`)
   }
 
-  const coinsGained = sellFish * state.merchantPrices.fishPrice + sellWheat * state.merchantPrices.wheatPrice
+  const coinsGained = sellCake * state.merchantPrices.cakePrice + sellGoods * state.merchantPrices.goodsPrice
 
   const newState = updateCharacter(state, charId, {
     resources: {
-      fish: res.fish - sellFish,
-      wheat: res.wheat - sellWheat,
+      ...res,
+      cake: res.cake - sellCake,
+      goods: res.goods - sellGoods,
       coins: res.coins + coinsGained,
     },
     tradeSlots: c.tradeSlots - 1,
   })
 
-  const parts = []
-  if (sellFish > 0) parts.push(`${sellFish} fish`)
-  if (sellWheat > 0) parts.push(`${sellWheat} wheat`)
+  const parts: string[] = []
+  if (sellCake > 0) parts.push(`${sellCake} ${RESOURCE_LABELS.cake}`)
+  if (sellGoods > 0) parts.push(`${sellGoods} ${RESOURCE_LABELS.goods}`)
 
-  return addLog(newState, `${charId} sold ${parts.join(' and ')} to the merchant for ${coinsGained} coins.`)
+  return addLog(
+    newState,
+    `${nameOf(charId)} sold ${parts.join(' and ')} to the merchant for ${coinsGained} ${RESOURCE_LABELS.coins}.`,
+  )
 }
 
 export function executePeerTrade(
   state: GameState,
   from: CharacterId,
   to: CharacterId,
-  offer: { fish: number; wheat: number; coins: number },
-  request: { fish: number; wheat: number; coins: number },
+  offer: TradeOffer,
+  request: TradeOffer,
 ): GameState {
   const cFrom = state.characters[from]
   const cTo = state.characters[to]
@@ -575,52 +590,56 @@ export function executePeerTrade(
   const fromRes = safeResources(cFrom.resources)
   const toRes = safeResources(cTo.resources)
   const o = {
-    fish: safeNum(offer.fish),
-    wheat: safeNum(offer.wheat),
+    cake: safeNum(offer.cake),
+    goods: safeNum(offer.goods),
     coins: safeNum(offer.coins),
   }
   const r = {
-    fish: safeNum(request.fish),
-    wheat: safeNum(request.wheat),
+    cake: safeNum(request.cake),
+    goods: safeNum(request.goods),
     coins: safeNum(request.coins),
   }
 
   // Validate that both parties have enough resources
-  if (fromRes.fish < o.fish ||
-      fromRes.wheat < o.wheat ||
+  if (fromRes.cake < o.cake ||
+      fromRes.goods < o.goods ||
       fromRes.coins < o.coins ||
-      toRes.fish < r.fish ||
-      toRes.wheat < r.wheat ||
+      toRes.cake < r.cake ||
+      toRes.goods < r.goods ||
       toRes.coins < r.coins) {
     return addLog(state, `Trade rejected: insufficient resources.`)
   }
 
   // Validate that resulting resources are non-negative
-  const newFromFish = fromRes.fish - o.fish + r.fish
-  const newFromWheat = fromRes.wheat - o.wheat + r.wheat
+  const newFromCake = fromRes.cake - o.cake + r.cake
+  const newFromGoods = fromRes.goods - o.goods + r.goods
   const newFromCoins = fromRes.coins - o.coins + r.coins
-  const newToFish = toRes.fish + o.fish - r.fish
-  const newToWheat = toRes.wheat + o.wheat - r.wheat
+  const newToCake = toRes.cake + o.cake - r.cake
+  const newToGoods = toRes.goods + o.goods - r.goods
   const newToCoins = toRes.coins + o.coins - r.coins
 
-  if (newFromFish < 0 || newFromWheat < 0 || newFromCoins < 0 ||
-      newToFish < 0 || newToWheat < 0 || newToCoins < 0) {
+  if (newFromCake < 0 || newFromGoods < 0 || newFromCoins < 0 ||
+      newToCake < 0 || newToGoods < 0 || newToCoins < 0) {
     return addLog(state, `Trade rejected: would result in negative resources.`)
   }
 
+  // `might` is carried through untouched — 武力 is never part of a deal, it is
+  // what you spend when there is no deal to be had (stage C).
   const newFrom = {
     ...cFrom,
     resources: {
-      fish: newFromFish,
-      wheat: newFromWheat,
+      cake: newFromCake,
+      goods: newFromGoods,
+      might: fromRes.might,
       coins: newFromCoins,
     },
   }
   const newTo = {
     ...cTo,
     resources: {
-      fish: newToFish,
-      wheat: newToWheat,
+      cake: newToCake,
+      goods: newToGoods,
+      might: toRes.might,
       coins: newToCoins,
     },
   }
@@ -635,7 +654,7 @@ export function executePeerTrade(
   const characters = { ...state.characters, [from]: newFrom, [to]: newTo }
   const newState = { ...state, characters, friendship: newFriendship, updatedAt: nowIso() }
   const festivalNote = state.dailyEvent === 'festival' ? ' (festival 2×)' : ''
-  return addLog(newState, `${from} traded with ${to}. Friendship +${bonus}${festivalNote}.`)
+  return addLog(newState, `${nameOf(from)} traded with ${nameOf(to)}. Friendship +${bonus}${festivalNote}.`)
 }
 
 function updateCharacter(state: GameState, charId: CharacterId, patch: Partial<CharacterState>): GameState {

@@ -1,4 +1,4 @@
-import { GAME_CONFIG, type CharacterId, type CharacterState, type DayPhase, type GameState } from '@game/shared'
+import { GAME_CONFIG, LABOR_LABELS, RESOURCE_LABELS, type CharacterId, type CharacterState, type DayPhase, type GameState } from '@game/shared'
 
 import type { InteractionType } from '@/game/GameWorld'
 import { CHARACTER_META } from '@/stores/game'
@@ -57,10 +57,10 @@ const PHASE_FLOW: Array<{
   {
     id: 'dawn',
     label: 'Dawn',
-    summary: 'Prices and harvests refresh.',
+    summary: 'Prices and events refresh.',
     details: [
       'Merchant prices roll for the new day.',
-      'Queued wheat harvests resolve here.',
+      'The daily event resolves here — downpour, festival, windfall, cargo spill or famine.',
       `Everyone resets to ${GAME_CONFIG.TRADE_SLOTS_PER_DAY} trade slots.`,
     ],
     phaseIds: ['day_start'],
@@ -68,10 +68,10 @@ const PHASE_FLOW: Array<{
   {
     id: 'labor',
     label: 'Labor',
-    summary: 'Spend the mandatory gather action.',
+    summary: `Spend the mandatory ${LABOR_LABELS.work} / ${LABOR_LABELS.train} action.`,
     details: [
-      `Fishing grants +${GAME_CONFIG.FISH_PER_LABOR} fish immediately.`,
-      `Farming queues +${GAME_CONFIG.WHEAT_PER_HARVEST} wheat after ${GAME_CONFIG.HARVEST_DELAY_DAYS} days.`,
+      `${LABOR_LABELS.work} grants +${GAME_CONFIG.CAKE_PER_WORK} ${RESOURCE_LABELS.cake} and +${GAME_CONFIG.GOODS_PER_WORK} ${RESOURCE_LABELS.goods} immediately.`,
+      `${LABOR_LABELS.train} grants +${GAME_CONFIG.MIGHT_PER_TRAINING} ${RESOURCE_LABELS.might} immediately.`,
       'You must finish labor before trading opens.',
     ],
     phaseIds: ['player_labor'],
@@ -82,7 +82,7 @@ const PHASE_FLOW: Array<{
     summary: 'Convert resources into deals or coins.',
     details: [
       `Use up to ${GAME_CONFIG.TRADE_SLOTS_PER_DAY} trade slots.`,
-      'Sell to the ship or negotiate with one nearby islander.',
+      'Sell to the market or negotiate with one nearby resident.',
       'End the turn once your deals are done.',
     ],
     phaseIds: ['player_trade'],
@@ -92,8 +92,8 @@ const PHASE_FLOW: Array<{
     label: 'Resolve',
     summary: 'AI, upkeep, and rollover happen here.',
     details: [
-      'Island AI takes its labor and trade turns.',
-      `Night upkeep consumes ${GAME_CONFIG.DAILY_FISH_COST} fish and ${GAME_CONFIG.DAILY_WHEAT_COST} wheat.`,
+      'The other residents take their labor and trade turns.',
+      `Night upkeep consumes ${GAME_CONFIG.DAILY_CAKE_COST} ${RESOURCE_LABELS.cake}. ${RESOURCE_LABELS.goods} are not eaten — they are purely for trade.`,
       'The day either advances to the next dawn or ends the run.',
     ],
     phaseIds: ['ai_turns', 'settlement', 'day_end', 'game_over'],
@@ -101,11 +101,11 @@ const PHASE_FLOW: Array<{
 ]
 
 const PHASE_OBJECTIVES: Record<DayPhase, string> = {
-  day_start: 'Wait for the new day to finish setting prices and harvesting queued wheat.',
-  player_labor: 'Reach a fishing spot or farmland and spend your mandatory labor action.',
-  player_trade: 'Trade with the ship or one nearby islander before ending the turn.',
-  ai_turns: 'Observe AI labor and trades. Player input is paused until they finish.',
-  settlement: 'Night upkeep resolves: everyone spends 1 fish and 1 wheat.',
+  day_start: 'Wait for the new day to finish setting prices and resolving the daily event.',
+  player_labor: 'Reach the workshop or the martial arts hall and spend your mandatory labor action.',
+  player_trade: 'Trade at the market or negotiate with one nearby resident before ending the turn.',
+  ai_turns: 'Observe the other residents\' labor and trades. Player input is paused until they finish.',
+  settlement: `Night upkeep resolves: everyone eats ${GAME_CONFIG.DAILY_CAKE_COST} ${RESOURCE_LABELS.cake}.`,
   day_end: 'Daily cleanup is finishing before the next dawn begins.',
   game_over: 'The run has ended. Review the outcome or start over.',
 }
@@ -125,29 +125,29 @@ export function buildPreviewRuleSections(state: GameState | null): PreviewRuleSe
     {
       title: 'Win Condition',
       lines: [
-        `Reach ${GAME_CONFIG.WIN_COINS} coins and board the ship before anyone else.`,
+        `Reach ${GAME_CONFIG.WIN_COINS} coins and buy your way out before anyone else.`,
         `Current day: ${state?.day ?? 1}.`,
       ],
     },
     {
       title: 'Daily Loop',
       lines: [
-        `Labor first: fish +${GAME_CONFIG.FISH_PER_LABOR} instantly or plant +${GAME_CONFIG.WHEAT_PER_HARVEST} wheat.`,
-        `Then spend up to ${GAME_CONFIG.TRADE_SLOTS_PER_DAY} trade slots with NPCs or the merchant ship.`,
+        `Labor first: ${LABOR_LABELS.work} for +${GAME_CONFIG.CAKE_PER_WORK} ${RESOURCE_LABELS.cake} and +${GAME_CONFIG.GOODS_PER_WORK} ${RESOURCE_LABELS.goods}, or ${LABOR_LABELS.train} for +${GAME_CONFIG.MIGHT_PER_TRAINING} ${RESOURCE_LABELS.might}.`,
+        `Then spend up to ${GAME_CONFIG.TRADE_SLOTS_PER_DAY} trade slots with residents or the market.`,
       ],
     },
     {
       title: 'Survival',
       lines: [
-        `Every night costs ${GAME_CONFIG.DAILY_FISH_COST} fish and ${GAME_CONFIG.DAILY_WHEAT_COST} wheat.`,
-        `If either resource hits 0 during settlement, that character is eliminated.`,
+        `Every night costs ${GAME_CONFIG.DAILY_CAKE_COST} ${RESOURCE_LABELS.cake}. ${RESOURCE_LABELS.goods} are never eaten.`,
+        `If your ${RESOURCE_LABELS.cake} hits 0 during settlement, you are eliminated.`,
       ],
     },
     {
       title: 'Current Market',
       lines: [
-        `Fish price: ${state?.merchantPrices.fishPrice ?? 3} coins.`,
-        `Wheat price: ${state?.merchantPrices.wheatPrice ?? 2} coins.`,
+        `${RESOURCE_LABELS.cake} price: ${state?.merchantPrices.cakePrice ?? 3} coins.`,
+        `${RESOURCE_LABELS.goods} price: ${state?.merchantPrices.goodsPrice ?? 2} coins.`,
       ],
     },
   ]
@@ -181,7 +181,7 @@ export function buildPreviewDetails(context: PreviewPanelContext): PreviewDetail
   }
 
   switch (context.interaction.kind) {
-    case 'fish':
+    case 'work':
       return {
         kindLabel: 'Resource Node',
         title: meta.title,
@@ -189,16 +189,20 @@ export function buildPreviewDetails(context: PreviewPanelContext): PreviewDetail
         sections: [
           {
             title: 'Yield',
-            note: 'Fishing is the immediate labor option. It does not create a delayed queue.',
+            note: `${LABOR_LABELS.work} pays immediately in both food and merchandise.`,
             stats: [
               {
                 label: 'Phase Gate',
                 value: context.phase === 'player_labor' ? 'Available now' : 'Labor already spent',
                 tone: context.phase === 'player_labor' ? 'good' : 'warn',
               },
-              { label: 'Output', value: `+${GAME_CONFIG.FISH_PER_LABOR} fish instantly`, tone: 'good' },
+              {
+                label: 'Output',
+                value: `+${GAME_CONFIG.CAKE_PER_WORK} ${RESOURCE_LABELS.cake}, +${GAME_CONFIG.GOODS_PER_WORK} ${RESOURCE_LABELS.goods}`,
+                tone: 'good',
+              },
               { label: 'Action Cost', value: 'Uses today\'s labor action' },
-              { label: 'Night Upkeep', value: `${GAME_CONFIG.DAILY_FISH_COST} fish + ${GAME_CONFIG.DAILY_WHEAT_COST} wheat`, tone: 'accent' },
+              { label: 'Night Upkeep', value: `${GAME_CONFIG.DAILY_CAKE_COST} ${RESOURCE_LABELS.cake}`, tone: 'accent' },
             ],
           },
           {
@@ -209,26 +213,24 @@ export function buildPreviewDetails(context: PreviewPanelContext): PreviewDetail
         ],
       }
 
-    case 'farm': {
-      const harvests = getHarvestSummary(context.state, 'player')
+    case 'train':
       return {
-        kindLabel: 'Production Node',
+        kindLabel: 'Training Node',
         title: meta.title,
         subtitle: meta.subtitle,
         sections: [
           {
             title: 'Yield',
-            note: 'Farming delays the payoff, but the wheat burst is larger than fishing.',
+            note: `${LABOR_LABELS.train} trades food income for ${RESOURCE_LABELS.might} — the leverage you need once deals stop being voluntary.`,
             stats: [
               {
                 label: 'Phase Gate',
                 value: context.phase === 'player_labor' ? 'Available now' : 'Labor already spent',
                 tone: context.phase === 'player_labor' ? 'good' : 'warn',
               },
-              { label: 'Output', value: `+${GAME_CONFIG.WHEAT_PER_HARVEST} wheat`, tone: 'good' },
-              { label: 'Harvest Delay', value: `${GAME_CONFIG.HARVEST_DELAY_DAYS} days` },
-              { label: 'Queued Fields', value: String(harvests.count) },
-              { label: 'Next Harvest', value: harvests.nextHarvestDay },
+              { label: 'Output', value: `+${GAME_CONFIG.MIGHT_PER_TRAINING} ${RESOURCE_LABELS.might}`, tone: 'good' },
+              { label: 'Action Cost', value: 'Uses today\'s labor action' },
+              { label: 'No Sale Value', value: `Earns no ${RESOURCE_LABELS.goods} to sell`, tone: 'warn' },
             ],
           },
           {
@@ -238,14 +240,13 @@ export function buildPreviewDetails(context: PreviewPanelContext): PreviewDetail
           ...buildFutureInteractionSections(context.interaction, context.state),
         ],
       }
-    }
 
     case 'merchant': {
       const prices = context.state?.merchantPrices
-      const playerFish = player?.resources.fish ?? 0
-      const playerWheat = player?.resources.wheat ?? 0
+      const playerCake = player?.resources.cake ?? 0
+      const playerGoods = player?.resources.goods ?? 0
       const projectedCoins = prices
-        ? playerFish * prices.fishPrice + playerWheat * prices.wheatPrice
+        ? playerCake * prices.cakePrice + playerGoods * prices.goodsPrice
         : 0
 
       return {
@@ -255,15 +256,15 @@ export function buildPreviewDetails(context: PreviewPanelContext): PreviewDetail
         sections: [
           {
             title: 'Market Rates',
-            note: 'The ship is the only direct path from resources into coins.',
+            note: 'The night market is the only direct path from goods into coins.',
             stats: [
               {
                 label: 'Phase Gate',
                 value: context.phase === 'player_trade' ? 'Open now' : 'Trade phase only',
                 tone: context.phase === 'player_trade' ? 'good' : 'warn',
               },
-              { label: 'Fish Price', value: `${prices?.fishPrice ?? 0} coins` },
-              { label: 'Wheat Price', value: `${prices?.wheatPrice ?? 0} coins` },
+              { label: `${RESOURCE_LABELS.cake} Price`, value: `${prices?.cakePrice ?? 0} coins` },
+              { label: `${RESOURCE_LABELS.goods} Price`, value: `${prices?.goodsPrice ?? 0} coins` },
               { label: 'Trade Slots Left', value: String(context.playerTradeSlots) },
               { label: 'All-In Sale Value', value: `${projectedCoins} coins`, tone: 'accent' },
             ],
@@ -280,11 +281,10 @@ export function buildPreviewDetails(context: PreviewPanelContext): PreviewDetail
     case 'npc': {
       const target = context.state?.characters[context.interaction.characterId] ?? null
       const personality = CHARACTER_META[context.interaction.characterId]?.personality ?? 'Unknown'
-      const harvests = getHarvestSummary(context.state, context.interaction.characterId)
       const canTrade = canTradeWithNpc(context, target, context.interaction.characterId)
 
       return {
-        kindLabel: 'Islander',
+        kindLabel: 'Resident',
         title: meta.title,
         subtitle: meta.subtitle,
         sections: [
@@ -308,10 +308,10 @@ export function buildPreviewDetails(context: PreviewPanelContext): PreviewDetail
             stats: buildResourceStats(target),
           },
           {
-            title: 'Production Queue',
+            title: 'Leverage',
+            note: `${RESOURCE_LABELS.might} decides who can force a trade rather than ask for one.`,
             stats: [
-              { label: 'Queued Harvests', value: String(harvests.count) },
-              { label: 'Next Harvest', value: harvests.nextHarvestDay },
+              { label: RESOURCE_LABELS.might, value: String(target?.resources.might ?? 0), tone: 'accent' },
             ],
           },
           ...buildFutureInteractionSections(context.interaction, context.state),
@@ -349,7 +349,7 @@ export function buildPreviewDetails(context: PreviewPanelContext): PreviewDetail
             title: 'Outcomes',
             stats: [
               { label: 'Win Reward', value: `+${GAME_CONFIG.DUNGEON_COIN_REWARD} coins`, tone: 'good' },
-              { label: 'Loss Penalty', value: `-${GAME_CONFIG.DUNGEON_RESOURCE_PENALTY} fish & wheat`, tone: 'warn' },
+              { label: 'Loss Penalty', value: `-${GAME_CONFIG.DUNGEON_RESOURCE_PENALTY} ${RESOURCE_LABELS.cake} & ${RESOURCE_LABELS.goods}`, tone: 'warn' },
               { label: 'Boss HP', value: String(GAME_CONFIG.BOSS_MAX_HP), tone: 'accent' },
               { label: 'Player HP', value: String(GAME_CONFIG.PLAYER_MAX_HP) },
             ],
@@ -367,23 +367,11 @@ export function buildPreviewDetails(context: PreviewPanelContext): PreviewDetail
 
 function buildResourceStats(character: CharacterState | null): PreviewStat[] {
   return [
-    { label: 'Fish', value: String(character?.resources.fish ?? 0) },
-    { label: 'Wheat', value: String(character?.resources.wheat ?? 0) },
-    { label: 'Coins', value: String(character?.resources.coins ?? 0), tone: 'good' },
+    { label: RESOURCE_LABELS.cake, value: String(character?.resources.cake ?? 0) },
+    { label: RESOURCE_LABELS.goods, value: String(character?.resources.goods ?? 0) },
+    { label: RESOURCE_LABELS.might, value: String(character?.resources.might ?? 0) },
+    { label: RESOURCE_LABELS.coins, value: String(character?.resources.coins ?? 0), tone: 'good' },
   ]
-}
-
-function getHarvestSummary(state: GameState | null, charId: CharacterId) {
-  const harvests = state?.pendingHarvests.filter((harvest) => harvest.characterId === charId) ?? []
-  const nextHarvest = harvests.reduce<number | null>((soonest, harvest) => {
-    if (soonest === null) return harvest.harvestOnDay
-    return Math.min(soonest, harvest.harvestOnDay)
-  }, null)
-
-  return {
-    count: harvests.length,
-    nextHarvestDay: nextHarvest === null ? 'None queued' : `Day ${nextHarvest}`,
-  }
 }
 
 function canTradeWithNpc(

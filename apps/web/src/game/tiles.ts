@@ -1,17 +1,19 @@
 // ============================================================
-// Island Escape — Tile Map Data & Types
+// Kowloon Walled City — Tile Map Data & Types
 // ============================================================
+
+import type { CharacterId } from '@game/shared'
 
 export type TileType =
   | 'water'
   | 'sand'
   | 'grass'
-  | 'farmland'
+  | 'dojo'
   | 'dock'
   | 'house'
   | 'tree'
   | 'rock'
-  | 'fishing_spot'
+  | 'workshop'
   | 'path'
   | 'cave'
 
@@ -33,13 +35,19 @@ export function isWalkable(tile: TileType): boolean {
   }
 }
 
-/** Whether a tile is interactable and what type */
+/**
+ * Whether a tile is interactable and what type.
+ *
+ * The returned kind is the same id the labor action uses (`work` / `train`),
+ * so the interaction menu can offer the matching action without a translation
+ * table in between.
+ */
 export function getInteraction(tile: TileType): string | null {
   switch (tile) {
-    case 'fishing_spot':
-      return 'fish'
-    case 'farmland':
-      return 'farm'
+    case 'workshop':
+      return 'work'
+    case 'dojo':
+      return 'train'
     case 'dock':
       return 'merchant'
     case 'cave':
@@ -49,18 +57,18 @@ export function getInteraction(tile: TileType): string | null {
   }
 }
 
-// W = water, S = sand, G = grass, F = farmland, D = dock,
-// H = house, T = tree, R = rock, X = fishing_spot, P = path
+// W = water, S = sand, G = grass, F = dojo (武馆), D = dock,
+// H = house, T = tree, R = rock, X = workshop (工场), P = path
 const MAP_KEY: Record<string, TileType> = {
   W: 'water',
   S: 'sand',
   G: 'grass',
-  F: 'farmland',
+  F: 'dojo',
   D: 'dock',
   H: 'house',
   T: 'tree',
   R: 'rock',
-  X: 'fishing_spot',
+  X: 'workshop',
   P: 'path',
   C: 'cave',
 }
@@ -84,14 +92,14 @@ const MAP_RAW: string[] = [
   'WWWWWWWWWWWWWWWWWWWW', // row 14
 ]
 
-export const ISLAND_MAP: TileType[][] = MAP_RAW.map((row) =>
+export const CITY_MAP: TileType[][] = MAP_RAW.map((row) =>
   row.split('').map((ch) => MAP_KEY[ch] ?? 'water'),
 )
 
 /** Get tile at grid position, or water if out of bounds */
 export function getTile(col: number, row: number): TileType {
   if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) return 'water'
-  return ISLAND_MAP[row]![col]!
+  return CITY_MAP[row]![col]!
 }
 
 // ----- Named Locations for Characters -----
@@ -101,23 +109,29 @@ export interface MapPosition {
   row: number
 }
 
-/** Starting positions for all characters */
-export const CHARACTER_POSITIONS: Record<string, MapPosition> = {
+/**
+ * Starting positions for all characters.
+ *
+ * Keyed by CharacterId rather than `string`: with a loose key the lookup in
+ * GameWorld silently falls back to one shared tile, stacking every NPC on top
+ * of each other instead of reporting a missing entry.
+ */
+export const CHARACTER_POSITIONS: Record<CharacterId, MapPosition> = {
   player: { col: 7, row: 5 },
-  tom: { col: 5, row: 4 },
-  sam: { col: 12, row: 8 },
-  lily: { col: 8, row: 7 },
-  jack: { col: 10, row: 10 },
+  san: { col: 5, row: 4 },
+  shun: { col: 12, row: 8 },
+  cyclone: { col: 8, row: 7 },
+  simon: { col: 10, row: 10 },
 }
 
 /** Important locations on the map */
 export const LOCATIONS = {
-  village_center: { col: 7, row: 6 },
+  street_center: { col: 7, row: 6 },
   dock: { col: 16, row: 9 },
-  fishing_spot_1: { col: 18, row: 5 },
-  fishing_spot_2: { col: 1, row: 8 },
-  farmland: { col: 13, row: 8 },
-  merchant_ship: { col: 17, row: 9 },
+  workshop_1: { col: 18, row: 5 },
+  workshop_2: { col: 1, row: 8 },
+  dojo: { col: 13, row: 8 },
+  market: { col: 17, row: 9 },
   dungeon: { col: 6, row: 2 },
 } as const
 
@@ -155,14 +169,15 @@ export function getActionTarget(
   fromCol = 7,
   fromRow = 6,
 ): MapPosition {
+  // `action` is a labor or trade id ('work' | 'train' | 'trade_merchant' | …)
   switch (action) {
-    case 'fish':
-      return findNearestTile(fromCol, fromRow, 'fishing_spot') ?? LOCATIONS.fishing_spot_1
-    case 'farm':
-      return findNearestTile(fromCol, fromRow, 'farmland') ?? LOCATIONS.farmland
+    case 'work':
+      return findNearestTile(fromCol, fromRow, 'workshop') ?? LOCATIONS.workshop_1
+    case 'train':
+      return findNearestTile(fromCol, fromRow, 'dojo') ?? LOCATIONS.dojo
     case 'trade_merchant':
       return findNearestTile(fromCol, fromRow, 'dock') ?? LOCATIONS.dock
     default:
-      return LOCATIONS.village_center
+      return LOCATIONS.street_center
   }
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useGameStore } from '@/stores/game'
+import { LABOR_LABELS, RESOURCE_LABELS } from '@game/shared'
 
 const game = useGameStore()
 
@@ -22,8 +23,8 @@ const hint = computed<HintData>(() => {
     return {
       show: true,
       step: 'Step 1 of 2',
-      title: 'LABOR — Gather food',
-      detail: 'Walk to a fishing spot (sand near water) or farmland (yellow tile). Press E to fish or farm.',
+      title: `LABOR — ${LABOR_LABELS.work} or ${LABOR_LABELS.train}`,
+      detail: 'Walk to the workshop (crates by the water) for odd jobs, or the martial arts hall (grey flagstones) to practice kung fu. Press E.',
       tone: 'labor',
     }
   }
@@ -34,22 +35,21 @@ const hint = computed<HintData>(() => {
         show: true,
         step: 'Trade slots used',
         title: 'No more trades today',
-        detail: 'Click End Turn to let AI islanders take their turns and advance the day.',
+        detail: 'Click End Turn to let the other residents take their turns and advance the day.',
         tone: 'idle',
       }
     }
-    const fish = player?.resources.fish ?? 0
-    const wheat = player?.resources.wheat ?? 0
-    const lowOnFood = fish <= 2 || wheat <= 2
+    const cake = player?.resources.cake ?? 0
+    const lowOnFood = cake <= 2
     return {
       show: true,
       step: 'Step 2 of 2',
       title: `TRADE — ${slots} slot${slots === 1 ? '' : 's'} left`,
       detail: lowOnFood
-        ? 'Low on food! Negotiate with NPCs (E near them) or sell extras to the ship for coins.'
+        ? `Low on ${RESOURCE_LABELS.cake}! Negotiate with NPCs (E near them) or sell ${RESOURCE_LABELS.goods} to the market for ${RESOURCE_LABELS.coins}.`
         : dungeonUsed
-          ? 'Sell to the merchant ship for coins, or negotiate trades with NPCs. End Turn when done.'
-          : 'Sell to the ship for coins, talk to NPCs to trade, or fight the cave boss. End Turn when done.',
+          ? `Sell to the market for ${RESOURCE_LABELS.coins}, or negotiate trades with NPCs. End Turn when done.`
+          : `Sell to the market for ${RESOURCE_LABELS.coins}, talk to NPCs to trade, or fight the cave boss. End Turn when done.`,
       tone: 'trade',
     }
   }
@@ -58,7 +58,7 @@ const hint = computed<HintData>(() => {
     const who = game.thinkingCharacter
     return {
       show: true,
-      title: 'AI ISLANDERS TAKING THEIR TURNS',
+      title: 'OTHER RESIDENTS TAKING THEIR TURNS',
       detail: who ? `${who} is deciding what to do…` : 'Watch the event log to see their moves.',
       tone: 'wait',
     }
@@ -68,7 +68,7 @@ const hint = computed<HintData>(() => {
     return {
       show: true,
       title: 'NIGHT — Settlement',
-      detail: 'Everyone spends 1 fish and 1 wheat to survive the night.',
+      detail: `Everyone eats 1 ${RESOURCE_LABELS.cake} to survive the night.`,
       tone: 'night',
     }
   }
@@ -77,7 +77,7 @@ const hint = computed<HintData>(() => {
     return {
       show: true,
       title: 'DAWN — A new day begins',
-      detail: 'Merchant prices roll, queued harvests deliver, trade slots reset.',
+      detail: 'Market rates roll, daily events resolve, trade slots reset.',
       tone: 'idle',
     }
   }

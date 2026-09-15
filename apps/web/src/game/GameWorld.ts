@@ -1,5 +1,5 @@
 // ============================================================
-// Island Escape — Game World (Orchestrates PixiJS + Vue State)
+// Kowloon Walled City — Game World (Orchestrates PixiJS + Vue State)
 // ============================================================
 
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
@@ -17,7 +17,7 @@ import {
   isWalkable,
   type MapPosition,
 } from './tiles'
-import type { CharacterId } from '@game/shared'
+import type { AICharacterId, CharacterId } from '@game/shared'
 
 // Simple A* pathfinding
 function findPath(
@@ -133,9 +133,9 @@ function findPath(
 }
 
 export type InteractionType =
-  | { kind: 'npc'; characterId: CharacterId; characterName: string }
-  | { kind: 'fish' }
-  | { kind: 'farm' }
+  | { kind: 'npc'; characterId: AICharacterId; characterName: string }
+  | { kind: 'work' }
+  | { kind: 'train' }
   | { kind: 'merchant' }
   | { kind: 'dungeon' }
   | null
@@ -209,7 +209,7 @@ export class GameWorld {
   }
 
   /** Initialize characters on the map */
-  public initCharacters(characterIds: string[], names: Record<string, string>) {
+  public initCharacters(characterIds: CharacterId[], names: Record<string, string>) {
     // Remove existing
     for (const char of this.characters.values()) {
       char.destroy()
@@ -217,7 +217,7 @@ export class GameWorld {
     this.characters.clear()
 
     for (const id of characterIds) {
-      const pos = CHARACTER_POSITIONS[id] ?? { col: 10, row: 7 }
+      const pos = CHARACTER_POSITIONS[id]
       const config: CharacterConfig = {
         id,
         name: names[id] ?? id,
@@ -302,7 +302,10 @@ export class GameWorld {
       if (player.isAdjacentTo(char.col, char.row)) {
         const interaction: InteractionType = {
           kind: 'npc',
-          characterId: id as CharacterId,
+          // The loop above skips 'player', and `characters` only ever
+          // holds NPCs — this is the boundary where the string-keyed map
+          // becomes a typed id.
+          characterId: id as AICharacterId,
           characterName: char.name,
         }
         this.setInteractionHighlight(char.col, char.row, 'npc')
@@ -321,11 +324,11 @@ export class GameWorld {
       if (tileInteraction) {
         let interaction: InteractionType = null
         switch (tileInteraction) {
-          case 'fish':
-            interaction = { kind: 'fish' }
+          case 'work':
+            interaction = { kind: 'work' }
             break
-          case 'farm':
-            interaction = { kind: 'farm' }
+          case 'train':
+            interaction = { kind: 'train' }
             break
           case 'merchant':
             interaction = { kind: 'merchant' }
@@ -384,8 +387,8 @@ export class GameWorld {
     const pulse = 0.55 + Math.sin(this.interactionHighlightPhase * 4) * 0.25
 
     const colorByKind: Record<string, number> = {
-      fish: 0x6fd2ff,
-      farm: 0xffd76a,
+      work: 0x6fd2ff,
+      train: 0xffd76a,
       merchant: 0xff9e3a,
       dungeon: 0xff5a5a,
       npc: 0xff7fb6,
@@ -630,8 +633,8 @@ export class GameWorld {
         const newDist = Math.abs(nc - char.homeCol) + Math.abs(nr - char.homeRow)
 
         if (farFromHome) {
-          // We've drifted past the wander radius (e.g. AI walked to a fishing
-          // spot during their turn). Only let them step back toward home.
+          // We've drifted past the wander radius (e.g. AI walked to a workshop
+          // during their turn). Only let them step back toward home.
           if (newDist >= distFromHome) continue
         } else {
           // Inside the radius — stay within an axis-aligned box around home.

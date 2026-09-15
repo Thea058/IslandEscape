@@ -1,44 +1,48 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { useGameStore } from '@/stores/game'
-import { GAME_CONFIG, DAILY_EVENT_INFO, type DailyEvent } from '@game/shared'
+import {
+  GAME_CONFIG,
+  DAILY_EVENT_INFO,
+  RESOURCE_LABELS,
+  type DailyEvent,
+  type Resources,
+} from '@game/shared'
 
 const game = useGameStore()
 
-const fish = computed(() => game.playerState?.resources.fish ?? 0)
-const wheat = computed(() => game.playerState?.resources.wheat ?? 0)
-const coins = computed(() => game.playerState?.resources.coins ?? 0)
+const resources = computed<Resources>(
+  () => game.playerState?.resources ?? { cake: 0, goods: 0, might: 0, coins: 0 },
+)
+const coins = computed(() => resources.value.coins)
 const escapeProgress = computed(() => {
   const pct = Math.min(100, Math.round((coins.value / GAME_CONFIG.WIN_COINS) * 100))
   return pct
 })
 
-// Pulse animation tokens — bumped on every change to retrigger CSS animation.
-const fishPulse = ref(0)
-const wheatPulse = ref(0)
-const coinsPulse = ref(0)
-const fishTone = ref<'pos' | 'neg' | ''>('')
-const wheatTone = ref<'pos' | 'neg' | ''>('')
-const coinsTone = ref<'pos' | 'neg' | ''>('')
+/** One entry per resource, described once — the row, its icon and its colour. */
+const RESOURCE_ROWS: ReadonlyArray<{ key: keyof Resources; icon: string; label: string; color: string }> = [
+  { key: 'cake', icon: '🥮', label: `${RESOURCE_LABELS.cake} — eaten every night`, color: 'text-amber-300' },
+  { key: 'goods', icon: '📦', label: `${RESOURCE_LABELS.goods} — sold to the market`, color: 'text-orange-300' },
+  { key: 'might', icon: '👊', label: `${RESOURCE_LABELS.might} — spent to force a trade`, color: 'text-rose-300' },
+  { key: 'coins', icon: '🪙', label: `${RESOURCE_LABELS.coins} — ${GAME_CONFIG.WIN_COINS} buys your way out`, color: 'text-yellow-300' },
+]
 
-watch(fish, (newVal, oldVal) => {
-  if (oldVal === undefined || newVal === oldVal) return
-  fishPulse.value++
-  fishTone.value = newVal > oldVal ? 'pos' : 'neg'
-  window.setTimeout(() => { fishTone.value = '' }, 600)
+// Pulse animation tokens — bumped on every change to retrigger the CSS
+// animation. Keyed by resource so adding a row above needs no extra wiring.
+const pulse = reactive<Record<keyof Resources, number>>({ cake: 0, goods: 0, might: 0, coins: 0 })
+const tone = reactive<Record<keyof Resources, 'pos' | 'neg' | ''>>({
+  cake: '', goods: '', might: '', coins: '',
 })
-watch(wheat, (newVal, oldVal) => {
-  if (oldVal === undefined || newVal === oldVal) return
-  wheatPulse.value++
-  wheatTone.value = newVal > oldVal ? 'pos' : 'neg'
-  window.setTimeout(() => { wheatTone.value = '' }, 600)
-})
-watch(coins, (newVal, oldVal) => {
-  if (oldVal === undefined || newVal === oldVal) return
-  coinsPulse.value++
-  coinsTone.value = newVal > oldVal ? 'pos' : 'neg'
-  window.setTimeout(() => { coinsTone.value = '' }, 600)
-})
+
+for (const { key } of RESOURCE_ROWS) {
+  watch(() => resources.value[key], (newVal, oldVal) => {
+    if (oldVal === undefined || newVal === oldVal) return
+    pulse[key]++
+    tone[key] = newVal > oldVal ? 'pos' : 'neg'
+    window.setTimeout(() => { tone[key] = '' }, 600)
+  })
+}
 
 const phaseLabel = computed(() => {
   switch (game.phase) {
@@ -79,8 +83,8 @@ const phaseColor = computed(() => {
 })
 
 const tradeSlots = computed(() => game.playerTradeSlots)
-const merchantFish = computed(() => game.merchantPrices.fishPrice)
-const merchantWheat = computed(() => game.merchantPrices.wheatPrice)
+const merchantCake = computed(() => game.merchantPrices.cakePrice)
+const merchantGoods = computed(() => game.merchantPrices.goodsPrice)
 
 const dailyEvent = computed<DailyEvent>(() => game.state?.dailyEvent ?? 'none')
 const dailyEventInfo = computed(() => DAILY_EVENT_INFO[dailyEvent.value])
@@ -114,19 +118,12 @@ const dailyEventInfo = computed(() => DAILY_EVENT_INFO[dailyEvent.value])
     <div class="hud-divider" />
 
     <!-- Resources -->
-    <div class="hud-section" title="Fish">
-      <span class="hud-icon">F</span>
-      <span :key="fishPulse" :class="['hud-value', 'text-sky-300', fishTone && `pulse-${fishTone}`]">{{ fish }}</span>
-    </div>
-
-    <div class="hud-section" title="Wheat">
-      <span class="hud-icon">W</span>
-      <span :key="wheatPulse" :class="['hud-value', 'text-amber-300', wheatTone && `pulse-${wheatTone}`]">{{ wheat }}</span>
-    </div>
-
-    <div class="hud-section" title="Coins">
-      <span class="hud-icon">C</span>
-      <span :key="coinsPulse" :class="['hud-value', 'text-yellow-300', coinsTone && `pulse-${coinsTone}`]">{{ coins }}</span>
+    <div v-for="row in RESOURCE_ROWS" :key="row.key" class="hud-section" :title="row.label">
+      <span class="hud-icon">{{ row.icon }}</span>
+      <span
+        :key="pulse[row.key]"
+        :class="['hud-value', row.color, tone[row.key] && `pulse-${tone[row.key]}`]"
+      >{{ resources[row.key] }}</span>
     </div>
 
     <!-- Divider -->
@@ -138,16 +135,16 @@ const dailyEventInfo = computed(() => DAILY_EVENT_INFO[dailyEvent.value])
       <span class="hud-value text-purple-300">{{ tradeSlots }}</span>
     </div>
 
-    <!-- Merchant Prices -->
-    <div class="hud-section" title="Merchant prices">
-      <span class="hud-label text-[10px]">Ship: F={{ merchantFish }}c W={{ merchantWheat }}c</span>
+    <!-- Market Prices -->
+    <div class="hud-section" title="Market rates today">
+      <span class="hud-label text-[10px]">Market: 🥮{{ merchantCake }}c 📦{{ merchantGoods }}c</span>
     </div>
 
     <!-- Divider -->
     <div class="hud-divider" />
 
     <!-- Escape Progress -->
-    <div class="hud-section hud-section-wide" title="Escape progress (100 coins needed)">
+    <div class="hud-section hud-section-wide" :title="`Buy your way out (${GAME_CONFIG.WIN_COINS} ${RESOURCE_LABELS.coins} needed)`">
       <span class="hud-label">Escape</span>
       <div class="escape-bar">
         <div class="escape-fill" :style="{ width: escapeProgress + '%' }" />
@@ -214,12 +211,11 @@ const dailyEventInfo = computed(() => DAILY_EVENT_INFO[dailyEvent.value])
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 20px;
   border-radius: 4px;
-  font-size: 10px;
-  font-weight: bold;
-  color: #fff;
+  font-size: 13px;
+  line-height: 1;
   background: #3a4a5a;
 }
 

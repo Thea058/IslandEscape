@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useGameStore } from '@/stores/game'
+import { RESOURCE_LABELS, type Resources } from '@game/shared'
 
 interface Toast {
   id: number
-  kind: 'fish' | 'wheat' | 'coins'
+  kind: keyof Resources
   delta: number
 }
+
+/** Every resource gets a floating +N/-N toast. */
+const TRACKED: ReadonlyArray<keyof Resources> = ['cake', 'goods', 'might', 'coins']
 
 const game = useGameStore()
 const toasts = ref<Toast[]>([])
@@ -33,15 +37,7 @@ function watchResource(kind: Toast['kind']) {
   )
 }
 
-watchResource('fish')
-watchResource('wheat')
-watchResource('coins')
-
-function label(kind: Toast['kind']): string {
-  if (kind === 'fish') return 'fish'
-  if (kind === 'wheat') return 'wheat'
-  return 'coins'
-}
+for (const kind of TRACKED) watchResource(kind)
 </script>
 
 <template>
@@ -53,7 +49,7 @@ function label(kind: Toast['kind']): string {
         :class="['toast', `toast-${t.kind}`, t.delta > 0 ? 'toast-pos' : 'toast-neg']"
       >
         <span class="toast-delta">{{ t.delta > 0 ? '+' : '' }}{{ t.delta }}</span>
-        <span class="toast-kind">{{ label(t.kind) }}</span>
+        <span class="toast-kind">{{ RESOURCE_LABELS[t.kind] }}</span>
       </div>
     </TransitionGroup>
   </div>
@@ -107,8 +103,9 @@ function label(kind: Toast['kind']): string {
 .toast-neg { color: #df9f6d; }
 .toast-neg .toast-delta { color: #ff9a66; }
 
-.toast-fish .toast-kind { color: #76b5d2; }
-.toast-wheat .toast-kind { color: #e2c46a; }
+.toast-cake .toast-kind { color: #e2c46a; }
+.toast-goods .toast-kind { color: #dfa06d; }
+.toast-might .toast-kind { color: #e08a9a; }
 .toast-coins .toast-kind { color: #ffd54a; }
 
 @keyframes float-up {

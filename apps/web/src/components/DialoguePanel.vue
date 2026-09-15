@@ -1,11 +1,22 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
-import { useGameStore, CHARACTER_META } from '@/stores/game'
-import type { CharacterId, NegotiationMessage, TradeProposal } from '@game/shared'
-import { GAME_CONFIG } from '@game/shared'
+import { useGameStore, CHARACTER_META, characterMeta } from '@/stores/game'
+import type { AICharacterId, NegotiationMessage, TradeProposal, TradeOffer } from '@game/shared'
+import { GAME_CONFIG, RESOURCE_LABELS } from '@game/shared'
+
+/**
+ * Resources a trade proposal can move.
+ *
+ * `might` is deliberately absent — 武力 is spent to force a trade (stage C),
+ * never handed over as part of one. The engine's TradeOffer schema draws the
+ * same line, so this list cannot drift away from what the server accepts.
+ */
+type TradeResource = 'cake' | 'goods'
+const TRADE_RESOURCES: TradeResource[] = ['cake', 'goods']
 
 const props = defineProps<{
-  target: CharacterId
+  /** Always an NPC — the player has no dialogue panel with themselves. */
+  target: AICharacterId
 }>()
 
 const emit = defineEmits<{
@@ -19,11 +30,11 @@ const chatContainer = ref<HTMLElement | null>(null)
 
 // Template trade builder
 const templateAction = ref<'buy' | 'sell'>('buy')
-const templateResource = ref<'fish' | 'wheat'>('fish')
+const templateResource = ref<TradeResource>('cake')
 const templateAmount = ref(3)
 const templatePrice = ref(10)
 
-const targetMeta = computed(() => CHARACTER_META[props.target] ?? { name: props.target, emoji: '?', personality: '' })
+const targetMeta = computed(() => CHARACTER_META[props.target])
 
 // Friendship display
 const friendship = computed(() => game.getFriendship(props.target))
@@ -98,13 +109,14 @@ function buildTemplateProposal(): { text: string; proposal: TradeProposal } {
   const amount = templateAmount.value
   const price = templatePrice.value
 
+  const label = RESOURCE_LABELS[resource]
   const text = action === 'buy'
-    ? `I'd like to buy ${amount} ${resource} from you for ${price} coins`
-    : `I'll sell you ${amount} ${resource} for ${price} coins`
+    ? `I'd like to buy ${amount} ${label} from you for ${price} ${RESOURCE_LABELS.coins}`
+    : `I'll sell you ${amount} ${label} for ${price} ${RESOURCE_LABELS.coins}`
 
   // Buy = player gives coins, gets resource. Sell = player gives resource, gets coins.
-  const offer = { fish: 0, wheat: 0, coins: 0 }
-  const request = { fish: 0, wheat: 0, coins: 0 }
+  const offer: TradeOffer = { cake: 0, goods: 0, coins: 0 }
+  const request: TradeOffer = { cake: 0, goods: 0, coins: 0 }
   if (action === 'buy') {
     offer.coins = price
     request[resource] = amount
@@ -167,15 +179,21 @@ function validateProposal(proposal: TradeProposal): string | null {
   const o = proposal.offer
   const r = proposal.request
 
+  const fromName = characterMeta(proposal.from).name
+  const toName = characterMeta(proposal.to).name
+  const cake = RESOURCE_LABELS.cake
+  const goods = RESOURCE_LABELS.goods
+  const coins = RESOURCE_LABELS.coins
+
   // Check from has enough to give
-  if (fromResources.fish < o.fish) return `${proposal.from} doesn't have enough fish (has ${fromResources.fish}, needs ${o.fish}).`
-  if (fromResources.wheat < o.wheat) return `${proposal.from} doesn't have enough wheat (has ${fromResources.wheat}, needs ${o.wheat}).`
-  if (fromResources.coins < o.coins) return `${proposal.from} doesn't have enough coins (has ${fromResources.coins}, needs ${o.coins}).`
+  if (fromResources.cake < o.cake) return `${fromName} doesn't have enough ${cake} (has ${fromResources.cake}, needs ${o.cake}).`
+  if (fromResources.goods < o.goods) return `${fromName} doesn't have enough ${goods} (has ${fromResources.goods}, needs ${o.goods}).`
+  if (fromResources.coins < o.coins) return `${fromName} doesn't have enough ${coins} (has ${fromResources.coins}, needs ${o.coins}).`
 
   // Check to has enough to give
-  if (toResources.fish < r.fish) return `${proposal.to} doesn't have enough fish (has ${toResources.fish}, needs ${r.fish}).`
-  if (toResources.wheat < r.wheat) return `${proposal.to} doesn't have enough wheat (has ${toResources.wheat}, needs ${r.wheat}).`
-  if (toResources.coins < r.coins) return `${proposal.to} doesn't have enough coins (has ${toResources.coins}, needs ${r.coins}).`
+  if (toResources.cake < r.cake) return `${toName} doesn't have enough ${cake} (has ${toResources.cake}, needs ${r.cake}).`
+  if (toResources.goods < r.goods) return `${toName} doesn't have enough ${goods} (has ${toResources.goods}, needs ${r.goods}).`
+  if (toResources.coins < r.coins) return `${toName} doesn't have enough ${coins} (has ${toResources.coins}, needs ${r.coins}).`
 
   return null
 }
@@ -222,16 +240,13 @@ async function rejectDeal() {
   emit('close')
 }
 
-function speakerMeta(speakerId: string) {
-  return CHARACTER_META[speakerId] ?? { name: speakerId, emoji: '?' }
-}
-
 /** Pretty-print a TradeOffer for proposal display. Returns null when nothing is offered. */
-function formatOffer(offer: { fish: number; wheat: number; coins: number }): string | null {
+function formatOffer(offer: TradeOffer): string | null {
   const parts: string[] = []
-  if (offer.fish) parts.push(`${offer.fish} fish`)
-  if (offer.wheat) parts.push(`${offer.wheat} wheat`)
-  if (offer.coins) parts.push(`${offer.coins} coins`)
+  for (const key of TRADE_RESOURCES) {
+    if (offer[key]) parts.push(`${offer[key]} ${RESOURCE_LABELS[key]}`)
+  }
+  if (offer.coins) parts.push(`${offer.coins} ${RESOURCE_LABELS.coins}`)
   if (parts.length === 0) return null
   return parts.join(', ')
 }
@@ -279,7 +294,7 @@ function proposalSummary(msg: NegotiationMessage): { offer: string | null; reque
         :class="['chat-bubble-row', msg.speaker === 'player' ? 'chat-bubble-right' : 'chat-bubble-left']"
       >
         <div :class="['chat-bubble', msg.speaker === 'player' ? 'bubble-player' : 'bubble-npc']">
-          <div class="bubble-speaker">{{ speakerMeta(msg.speaker).name }}</div>
+          <div class="bubble-speaker">{{ characterMeta(msg.speaker).name }}</div>
           <div class="bubble-text">{{ msg.text }}</div>
           <div v-if="msg.proposal" class="proposal-block">
             <div class="proposal-row">
@@ -323,8 +338,8 @@ function proposalSummary(msg: NegotiationMessage): { offer: string | null; reque
           class="template-input"
         />
         <select v-model="templateResource" class="template-select">
-          <option value="fish">Fish</option>
-          <option value="wheat">Wheat</option>
+          <option value="cake">{{ RESOURCE_LABELS.cake }}</option>
+          <option value="goods">{{ RESOURCE_LABELS.goods }}</option>
         </select>
         <span class="template-for">for</span>
         <input

@@ -1,5 +1,5 @@
 // ============================================================
-// Island Escape — Keyboard Input Manager
+// Kowloon Walled City — Keyboard Input Manager
 // ============================================================
 
 export type InputAction = 'move_up' | 'move_down' | 'move_left' | 'move_right' | 'interact' | 'skill_flash' | 'skill_ultimate'

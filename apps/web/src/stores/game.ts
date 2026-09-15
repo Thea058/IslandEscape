@@ -5,6 +5,7 @@ import type {
   GameSSEEvent,
   PlayerAction,
   CharacterId,
+  AICharacterId,
   CharacterState,
   NegotiationMessage,
 } from '@game/shared'
@@ -13,21 +14,48 @@ import { createGame, submitAction as apiSubmitAction, getSSEUrl } from '@/compos
 import type { InteractionType } from '@/game/GameWorld'
 import { startIslandBGM } from '@/game/dungeon/AudioManager'
 
+export interface CharacterMeta {
+  name: string
+  personality: string
+  emoji: string
+}
+
 export interface NegotiationState {
   conversationId: string
-  target: CharacterId
+  /** The NPC counterparty — the player never negotiates with themselves. */
+  target: AICharacterId
   messages: NegotiationMessage[]
   isOpen: boolean
   /** true = first message not yet sent to server (trade_peer not called) */
   isNew: boolean
 }
 
-export const CHARACTER_META: Record<string, { name: string; personality: string; emoji: string }> = {
+/**
+ * Player-facing names. Keyed by CharacterId (not `string`) so a rename that
+ * misses an entry fails the build instead of silently rendering `undefined`.
+ *
+ * These are DISPLAY names only — never use them as engine keys. The engine
+ * looks characters up by id, and the two are deliberately allowed to diverge.
+ */
+export const CHARACTER_META: Record<CharacterId, CharacterMeta> = {
   player: { name: 'You', personality: 'Resourceful', emoji: '🧑' },
-  tom: { name: 'Tom', personality: 'Cautious Fisherman', emoji: '🧔' },
-  sam: { name: 'Sam', personality: 'Aggressive Trader', emoji: '👩' },
-  lily: { name: 'Lily', personality: 'Friendly Helper', emoji: '👧' },
-  jack: { name: 'Jack', personality: 'Cunning Schemer', emoji: '🤠' },
+  san: { name: '辛仔', personality: 'Guarded Lone Wolf', emoji: '🐺' },
+  shun: { name: '阿信', personality: 'Bold Street Player', emoji: '🔪' },
+  cyclone: { name: '龙哥', personality: 'Patient Big Player', emoji: '🐊' },
+  simon: { name: 'Simon', personality: 'Cautious Hacker', emoji: '💻' },
+}
+
+/**
+ * Look up display metadata for an id that has NOT been validated as a
+ * CharacterId — a key from `Object.keys()`, or an id parsed out of a server log
+ * line.
+ *
+ * The cast lives here, once, instead of at every call site: this is the
+ * boundary where unvalidated strings enter the UI, so it is the one place that
+ * must tolerate an unknown id and fall back to rendering it raw.
+ */
+export function characterMeta(id: string): CharacterMeta {
+  return CHARACTER_META[id as CharacterId] ?? { name: id, personality: '', emoji: '?' }
 }
 
 export const useGameStore = defineStore('game', () => {
@@ -46,7 +74,7 @@ export const useGameStore = defineStore('game', () => {
   const currentInteraction = ref<InteractionType>(null)
   const showActionMenu = ref(false)
   const showDialoguePanel = ref(false)
-  const dialogueTarget = ref<CharacterId | null>(null)
+  const dialogueTarget = ref<AICharacterId | null>(null)
 
   // ---- Dungeon state ----
   const dungeonMode = ref(false)
@@ -66,7 +94,7 @@ export const useGameStore = defineStore('game', () => {
 
   const day = computed(() => state.value?.day ?? 1)
   const phase = computed(() => state.value?.phase ?? 'day_start')
-  const merchantPrices = computed(() => state.value?.merchantPrices ?? { fishPrice: 3, wheatPrice: 2 })
+  const merchantPrices = computed(() => state.value?.merchantPrices ?? { cakePrice: 3, goodsPrice: 2 })
   const isPlayerTurn = computed(() => state.value?.phase === 'player_labor' || state.value?.phase === 'player_trade')
   const isGameOver = computed(() => state.value?.phase === 'game_over')
 
@@ -175,11 +203,11 @@ export const useGameStore = defineStore('game', () => {
       // Handle negotiation responses from server
       if (res.negotiation) {
         const neg = res.negotiation as { conversationId: string; messages: NegotiationMessage[] }
-        if (!activeNegotiation.value || activeNegotiation.value.target !== (action as { target?: CharacterId }).target) {
+        if (!activeNegotiation.value || activeNegotiation.value.target !== (action as { target?: AICharacterId }).target) {
           // Starting new negotiation (or target changed)
           activeNegotiation.value = {
             conversationId: neg.conversationId,
-            target: (action as { target?: CharacterId }).target ?? dialogueTarget.value ?? 'tom',
+            target: (action as { target?: AICharacterId }).target ?? dialogueTarget.value ?? 'san',
             messages: neg.messages,
             isOpen: true,
             isNew: false,
@@ -283,7 +311,7 @@ export const useGameStore = defineStore('game', () => {
         // An NPC opened a chat with the player. Surface it as an active
         // negotiation so the existing DialoguePanel pops up and the player
         // can respond via the normal negotiate_reply flow.
-        const ev = event as { initiatorId: CharacterId; conversationId: string; message: NegotiationMessage }
+        const ev = event as { initiatorId: AICharacterId; conversationId: string; message: NegotiationMessage }
         // Skip if the player is already mid-negotiation with someone — server
         // prevents creating a new one anyway.
         if (activeNegotiation.value && activeNegotiation.value.target !== ev.initiatorId) break
@@ -308,7 +336,7 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function openNegotiation(target: CharacterId, conversationId: string) {
+  function openNegotiation(target: AICharacterId, conversationId: string) {
     // Resume existing negotiation with this target if one is active
     if (activeNegotiation.value && activeNegotiation.value.target === target) {
       dialogueTarget.value = target
