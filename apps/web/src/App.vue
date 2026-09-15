@@ -176,7 +176,7 @@ const gameOverMessage = computed(() => {
             <span class="hud-val">{{ game.dungeonStats.hp }}/{{ game.dungeonStats.maxHp }}</span>
           </div>
           <div class="dungeon-hud-item boss-item">
-            <span class="hud-label">Giant Crab</span>
+            <span class="hud-label">Phantom</span>
             <div class="hud-bar-bg boss-bar-bg"><div class="hud-bar-fill boss-bar" :style="{ width: (game.dungeonStats.bossHp / game.dungeonStats.bossMaxHp * 100) + '%' }" /></div>
           </div>
           <div class="dungeon-hud-item xp-item">

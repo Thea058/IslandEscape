@@ -796,7 +796,8 @@ repoint `build` at `tsconfig.json`, that failure comes back.
 ### Correctness / design gaps
 
 - [ ] **Might has no sink.** `train` produces it and `executePeerTrade` explicitly carries it through untouched, but nothing spends it. Forcing a trade with Might is the next mechanic, and until it exists the fourth resource is dead weight.
-- [ ] **The boss has two names.** `resolveDungeon` logs `噬影` while `App.vue`'s HUD labels the fight "Giant Crab". Pick one.
+- [ ] **The boss name lives in two places.** `resolveDungeon` logs it and `App.vue`'s dungeon HUD labels it — one server string, one client string, currently both "Phantom". That is the same shape as the resource names that silently drifted apart, so it belongs in a shared constant alongside `RESOURCE_LABELS`.
+- [ ] **Three `LOCATIONS` coordinates are wrong.** `street_center` points at a house, `workshop_1` at water, `workshop_2` at sand. Only `street_center` is reachable — it's the unconditional `default` branch of `getActionTarget`, and because a house isn't walkable, `findPath` returns an empty path and the AI silently doesn't move.
 - [ ] **`chatText` in `llm.ts` is dead code** — negotiation uses `chatJSON` for everything. Either delete it or move the free-form dialogue onto it.
 
 ### Leftover island art (the retheme is incomplete visually)

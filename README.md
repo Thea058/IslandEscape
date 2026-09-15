@@ -91,9 +91,9 @@ Coins only come from the night market, and the market only pays for Kong Soh Bis
 
 ## Boss Dungeon
 
-There's a faster, riskier road to those Coins. Once a day you can spend a trade slot to enter the dungeon and fight the **Giant Crab**, a bullet-hell boss with a 150-HP state machine that escalates through three phases. It opens with aimed four-bullet volleys, then adds spinning ring barrages and summoned minions as its health drops, and in its final quarter throws eight-bullet volleys, denser rings, and a faster charge. The boss also scales with the day, so later runs hit harder.
+There's a faster, riskier road to those Coins. Once a day you can spend a trade slot to enter the dungeon and fight **Phantom**, a bullet-hell boss with a 150-HP state machine that escalates through three phases. It opens with aimed four-bullet volleys, then adds spinning ring barrages and summoned minions as its health drops, and in its final quarter throws eight-bullet volleys, denser rings, and a faster charge. The boss also scales with the day, so later runs hit harder.
 
-![Boss dungeon — bullet-hell fight against the Giant Crab](docs/screenshots/boss-dungeon.png)
+![Boss dungeon — bullet-hell fight against Phantom](docs/screenshots/boss-dungeon.png)
 
 - **Enter:** costs 1 trade slot, once per day
 - **Win:** +15 Coins, scaling up the longer you've survived (capped at 80)

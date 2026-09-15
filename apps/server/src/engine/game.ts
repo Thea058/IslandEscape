@@ -438,7 +438,7 @@ export function resolveDungeon(state: GameState, result: DungeonResult): GameSta
       ...newState,
       characters: { ...newState.characters, player: updatedPlayer },
     }
-    newState = addLog(newState, `${nameOf('player')} defeated 噬影! +${coinReward} ${RESOURCE_LABELS.coins}.`)
+    newState = addLog(newState, `${nameOf('player')} defeated Phantom! +${coinReward} ${RESOURCE_LABELS.coins}.`)
   } else {
     // Losing the dungeon used to be an instant kill on early days (lose 5 of a
     // resource from a starting pool of 6). Cap the loss so the player keeps at
