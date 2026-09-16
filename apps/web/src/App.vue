@@ -91,8 +91,33 @@ const gameOverMessage = computed(() => {
   <div v-if="!game.gameId" class="title-screen">
     <div class="title-content">
       <div class="title-logo">
-        <div class="title-island">
-          <div class="pixel-island"></div>
+        <!-- Decorative: the heading right below already names the game. -->
+        <div class="title-mark" aria-hidden="true">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <defs>
+              <clipPath id="title-mark-clip"><circle cx="40" cy="40" r="38.5" /></clipPath>
+              <!-- Dusk sky behind near-black towers: the silhouette needs the
+                   contrast to read at 80px, where two dark blues just mush. -->
+              <linearGradient id="title-mark-sky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#2a4a72" />
+                <stop offset="100%" stop-color="#16263f" />
+              </linearGradient>
+              <pattern id="title-mark-windows" width="7" height="8" patternUnits="userSpaceOnUse">
+                <rect x="1.5" y="2" width="2.4" height="2.4" fill="#ffcc44" />
+              </pattern>
+            </defs>
+            <circle cx="40" cy="40" r="38.5" fill="url(#title-mark-sky)" stroke="#1a3a52" stroke-width="3" />
+            <g clip-path="url(#title-mark-clip)">
+              <rect x="6" y="46" width="15" height="34" fill="#0b1220" />
+              <rect x="23" y="26" width="17" height="54" fill="#0b1220" />
+              <rect x="42" y="38" width="13" height="42" fill="#0b1220" />
+              <rect x="57" y="52" width="17" height="28" fill="#0b1220" />
+              <rect x="6" y="46" width="15" height="34" fill="url(#title-mark-windows)" opacity="0.9" />
+              <rect x="23" y="26" width="17" height="54" fill="url(#title-mark-windows)" />
+              <rect x="42" y="38" width="13" height="42" fill="url(#title-mark-windows)" opacity="0.85" />
+              <rect x="57" y="52" width="17" height="28" fill="url(#title-mark-windows)" opacity="0.9" />
+            </g>
+          </svg>
         </div>
         <h1 class="title-heading">KOWLOON WALLED CITY</h1>
         <p class="title-sub">A survival trading game with AI agents</p>
@@ -213,7 +238,7 @@ const gameOverMessage = computed(() => {
       <!-- Interaction Prompt (left/center) -->
       <div class="bottom-left">
         <InteractionPrompt
-          v-if="game.isPlayerTurn"
+          v-if="game.isPlayerTurn && !game.dungeonMode"
           :interaction="game.currentInteraction"
         />
         <div v-else-if="game.phase === 'ai_turns'" class="phase-indicator">
@@ -265,7 +290,11 @@ const gameOverMessage = computed(() => {
 
 .title-content {
   text-align: center;
-  max-width: 480px;
+  /* Wide enough for "KOWLOON WALLED CITY" on one line: at 34px monospace with
+     3px tracking the heading needs ~412px, and the box leaves ~496px. The old
+     480px box fitted "ISLANDESCAPE", but the longer name wrapped "CITY" onto a
+     line of its own. */
+  max-width: 560px;
   padding: 32px;
 }
 
@@ -273,26 +302,19 @@ const gameOverMessage = computed(() => {
   margin-bottom: 32px;
 }
 
-.title-island {
-  margin-bottom: 16px;
-}
-
-.pixel-island {
+.title-mark {
   width: 80px;
   height: 80px;
-  margin: 0 auto;
-  background: linear-gradient(180deg, #2389da 0%, #2389da 40%, #e8d5a3 40%, #e8d5a3 50%, #5b9a3e 50%, #5b9a3e 100%);
-  border-radius: 50%;
-  border: 3px solid #1a3a52;
-  image-rendering: pixelated;
+  margin: 0 auto 16px;
+  line-height: 0;
 }
 
 .title-heading {
   font-family: monospace;
-  font-size: 36px;
+  font-size: 34px;
   font-weight: 900;
   color: #e8d5a3;
-  letter-spacing: 4px;
+  letter-spacing: 3px;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   margin: 0;
 }
