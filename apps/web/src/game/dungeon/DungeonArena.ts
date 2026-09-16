@@ -48,7 +48,7 @@ export type DungeonEvent =
   | { type: 'card_pick'; cards: CardDef[] }
   | { type: 'stats_update'; hp: number; maxHp: number; bossHp: number; bossMaxHp: number; xp: number; xpNext: number }
   | { type: 'boss_defeated'; damageDealt: number; damageTaken: number; cardsCollected: number }
-  | { type: 'player_died'; damageDealt: number; cardsCollected: number }
+  | { type: 'player_died'; damageDealt: number; damageTaken: number; cardsCollected: number }
 
 const ARENA_W = 640
 const ARENA_H = 480
@@ -703,6 +703,7 @@ export class DungeonArena extends Container {
       this.fire({
         type: 'player_died',
         damageDealt: this.totalDamageDealt,
+        damageTaken: this.totalDamageTaken,
         cardsCollected: this.cardSystem.currentLevel,
       })
     }
