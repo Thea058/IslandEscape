@@ -1,10 +1,35 @@
-import { config } from 'dotenv'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { config } from 'dotenv'
 import { z } from 'zod'
 
 const shouldOverrideEnv = process.env.NODE_ENV !== 'test' && process.env.VITEST !== 'true'
-const rootEnvPath = fileURLToPath(new URL('../../../.env', import.meta.url))
-config({ path: rootEnvPath, override: shouldOverrideEnv })
+
+/**
+ * Absolute path to the workspace-root `.env`.
+ *
+ * Deliberately not a fixed `'../../../.env'`: the compiled copy sits one level
+ * deeper than the source (`dist/src/env.js` versus `src/env.ts`), so any fixed
+ * number of hops resolves correctly for exactly one of the two — and it is the
+ * compiled one that `pnpm start` runs, where a wrong path loads zero variables
+ * and fails as a missing OPENAI_API_KEY rather than a missing file.
+ *
+ * Walking up to the workspace root is layout-proof instead.
+ */
+function rootEnvPath(): string {
+  let dir = dirname(fileURLToPath(import.meta.url))
+  for (;;) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return join(dir, '.env')
+    const parent = dirname(dir)
+    if (parent === dir) {
+      throw new Error('Could not locate the workspace root: no pnpm-workspace.yaml above this file')
+    }
+    dir = parent
+  }
+}
+
+config({ path: rootEnvPath(), override: shouldOverrideEnv })
 
 export const EnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
