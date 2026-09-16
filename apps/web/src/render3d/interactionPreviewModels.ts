@@ -35,10 +35,12 @@ type PreviewGroup = PreviewObject3D & {
 
 type PreviewMesh = PreviewObject3D
 
-const WATER_COLOR = 0x1d7ec8
-const WATER_HIGHLIGHT = 0x63c0ff
-const SAND_COLOR = 0xe5d4a1
-const GRASS_COLOR = 0x5f9c4f
+// Keep the alley stage within reach of the workshop's stone: the preview panel is
+// only ~300px wide, and a genuinely dark alley just reads as an empty panel.
+const ALLEY_COLOR = 0x3d4149
+const ALLEY_HIGHLIGHT = 0x7d8794
+const FLAGSTONE_COLOR = 0x5a5f6b
+const LAMP_COLOR = 0xffcc44
 const STONE_COLOR = 0x4a4a52
 const STONE_HIGHLIGHT = 0x84848c
 const WOOD_COLOR = 0x7b5130
@@ -88,57 +90,105 @@ function createStage(baseColor: number, ringColor: number) {
   return group
 }
 
-function addPalm(group: PreviewGroup, x: number, z: number, scale = 1) {
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05 * scale, 0.08 * scale, 0.8 * scale, 8),
-    makeMaterial(0x8f6038, 0.85, 0.04),
+/** A wooden crate with a lighter band. Shared by the workshop and the alley. */
+function addCrate(group: PreviewGroup, x: number, y: number, z: number, size: number, tilt: number) {
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(size, size, size),
+    makeMaterial(WOOD_COLOR, 0.88, 0.03),
   )
-  trunk.rotation.z = 0.15
-  addMesh(group, trunk, x, 0.3 * scale, z)
+  box.rotation.y = tilt
+  addMesh(group, box, x, y, z)
 
-  for (let i = 0; i < 5; i += 1) {
-    const leaf = new THREE.Mesh(
-      new THREE.ConeGeometry(0.24 * scale, 0.65 * scale, 6),
-      makeMaterial(0x5ba950, 0.7, 0.03),
-    )
-    leaf.position.set(x, 0.75 * scale, z)
-    leaf.rotation.z = Math.PI / 2
-    leaf.rotation.y = (i / 5) * Math.PI * 2
-    leaf.rotation.x = 0.3
-    group.add(leaf)
-  }
+  const band = new THREE.Mesh(
+    new THREE.BoxGeometry(size * 1.02, size * 0.12, size * 1.02),
+    makeMaterial(0x9a6b3f, 0.8, 0.04),
+  )
+  band.rotation.y = tilt
+  addMesh(group, band, x, y, z)
 }
 
-function addGrassCluster(group: PreviewGroup, x: number, z: number, scale = 1) {
-  for (let i = 0; i < 4; i += 1) {
-    const blade = new THREE.Mesh(
-      new THREE.ConeGeometry(0.045 * scale, 0.26 * scale, 5),
-      makeMaterial(0x72b65f, 0.8, 0.02),
-    )
-    blade.position.set(x + (i - 1.5) * 0.05 * scale, 0.1 * scale, z + (i % 2 === 0 ? -0.05 : 0.05) * scale)
-    blade.rotation.z = (i - 1.5) * 0.12
-    group.add(blade)
-  }
-}
-
+/**
+ * Idle state — nothing within reach to inspect.
+ *
+ * The panel heading here reads "Back Alleys", so this is a stretch of the walled
+ * city at night: wet flagstones, a lamp standard, crates left for the next
+ * odd-job shift. It used to be a sand island with a palm tree, which was the
+ * last place the island theme still reached the screen.
+ */
 function createDefaultPreview() {
-  const group = createStage(WATER_COLOR, WATER_HIGHLIGHT)
+  const group = createStage(ALLEY_COLOR, ALLEY_HIGHLIGHT)
 
-  const island = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.72, 0.95, 0.28, 20),
-    makeMaterial(SAND_COLOR, 0.95, 0.01),
+  const floor = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.16, 1.15),
+    makeMaterial(FLAGSTONE_COLOR, 0.72, 0.04),
   )
-  addMesh(group, island, 0, 0.03, 0)
+  addMesh(group, floor, 0, 0.02, 0)
 
-  const grass = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.54, 0.68, 0.15, 18),
-    makeMaterial(GRASS_COLOR, 0.82, 0.04),
+  // A few slabs at different tones, so the floor does not read as one flat sheet
+  // of grey in a preview only ~300px wide.
+  const slab = (x: number, z: number, w: number, d: number, tone: number) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), makeMaterial(tone, 0.78, 0.03))
+    addMesh(group, mesh, x, 0.105, z)
+  }
+  slab(-0.46, -0.32, 0.54, 0.42, 0x6b7280)
+  slab(-0.38, 0.28, 0.5, 0.4, 0x51565f)
+  slab(0.44, -0.34, 0.46, 0.36, 0x6b7280)
+
+  // Puddle — a dark disc with a lighter rim. Cheapest way to say "it rained".
+  const puddle = new THREE.Mesh(
+    new THREE.CircleGeometry(0.3, 24),
+    new THREE.MeshBasicMaterial({ color: 0x2a5b85, transparent: true, opacity: 0.75 }),
   )
-  addMesh(group, grass, 0.08, 0.19, -0.05)
+  puddle.rotation.x = -Math.PI / 2
+  addMesh(group, puddle, -0.02, 0.101, 0.34)
 
-  addPalm(group, -0.28, 0.12, 0.9)
-  addGrassCluster(group, 0.38, 0.12)
-  addGrassCluster(group, 0.08, -0.28, 0.9)
+  const puddleRim = new THREE.Mesh(
+    new THREE.RingGeometry(0.3, 0.34, 24),
+    new THREE.MeshBasicMaterial({ color: 0xa8cbe8, transparent: true, opacity: 0.4 }),
+  )
+  puddleRim.rotation.x = -Math.PI / 2
+  addMesh(group, puddleRim, -0.02, 0.102, 0.34)
+
+  // Lamp standard, hung at the back. The warm glow is the same lit-window yellow
+  // the title logo uses, so the panel belongs to the same city as the logo.
+  const post = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.06, 1.15, 10),
+    makeMaterial(0x2b2f38, 0.85, 0.12),
+  )
+  addMesh(group, post, -0.6, 0.675, -0.6)
+
+  const bracket = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 0.05, 0.05),
+    makeMaterial(0x2b2f38, 0.85, 0.12),
+  )
+  addMesh(group, bracket, -0.45, 1.22, -0.6)
+
+  const lampHead = new THREE.Mesh(
+    new THREE.BoxGeometry(0.19, 0.16, 0.19),
+    makeMaterial(0x3a3f4a, 0.7, 0.1),
+  )
+  addMesh(group, lampHead, -0.33, 1.13, -0.6)
+
+  const bulb = new THREE.Mesh(
+    new THREE.BoxGeometry(0.13, 0.1, 0.13),
+    new THREE.MeshStandardMaterial({
+      color: LAMP_COLOR,
+      emissive: LAMP_COLOR,
+      emissiveIntensity: 0.95,
+      roughness: 0.4,
+    }),
+  )
+  addMesh(group, bulb, -0.33, 1.12, -0.6)
+
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 14, 12),
+    new THREE.MeshBasicMaterial({ color: LAMP_COLOR, transparent: true, opacity: 0.16 }),
+  )
+  addMesh(group, halo, -0.33, 1.12, -0.6)
+
+  // Crates waiting for the next shift.
+  addCrate(group, 0.46, 0.32, 0.3, 0.44, 0.24)
+  addCrate(group, 0.4, 0.72, 0.26, 0.36, -0.16)
 
   return group
 }
@@ -155,26 +205,11 @@ function createWorkPreview() {
 
   // Crates stacked two wide and three high, the top one set askew so the pile
   // reads as "in use" rather than as a shop display.
-  const crate = (x: number, y: number, z: number, size: number, tilt: number) => {
-    const box = new THREE.Mesh(
-      new THREE.BoxGeometry(size, size, size),
-      makeMaterial(WOOD_COLOR, 0.88, 0.03),
-    )
-    box.rotation.y = tilt
-    addMesh(group, box, x, y, z)
-    const band = new THREE.Mesh(
-      new THREE.BoxGeometry(size * 1.02, size * 0.12, size * 1.02),
-      makeMaterial(0x9a6b3f, 0.8, 0.04),
-    )
-    band.rotation.y = tilt
-    addMesh(group, band, x, y, z)
-  }
-
-  crate(-0.34, 0.26, -0.1, 0.44, 0)
-  crate(0.24, 0.26, 0.14, 0.4, 0.3)
-  crate(-0.3, 0.68, -0.08, 0.4, 0.12)
-  crate(0.2, 0.64, 0.12, 0.36, -0.22)
-  crate(-0.08, 1.04, 0.02, 0.34, 0.42)
+  addCrate(group, -0.34, 0.26, -0.1, 0.44, 0)
+  addCrate(group, 0.24, 0.26, 0.14, 0.4, 0.3)
+  addCrate(group, -0.3, 0.68, -0.08, 0.4, 0.12)
+  addCrate(group, 0.2, 0.64, 0.12, 0.36, -0.22)
+  addCrate(group, -0.08, 1.04, 0.02, 0.34, 0.42)
 
   return group
 }
