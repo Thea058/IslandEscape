@@ -805,10 +805,10 @@ repoint `build` at `tsconfig.json`, that failure comes back.
 ### Leftover island art (the retheme is incomplete visually)
 
 - [ ] `TileMap.ts` still draws a **sailboat** (hull, mast, sail) on the market tile, labelled "MARKET"
-- [ ] `interactionPreviewModels.ts` still has `addPalm` and a sandy-island default preview
 - [ ] `AudioManager.ts` still calls its track id `'island'` (`ISLAND_MELODY`, `startIslandBGM`)
 - [ ] Several source comments still describe the sea and the island (`TileMap.ts`, `GameWorld.ts`, `PlayerCombat.ts`)
-- [ ] The five screenshots in `docs/screenshots/` still show the original island build
+- [x] `interactionPreviewModels.ts` — the sandy-island default preview and its `addPalm` are gone; the idle state is now a back alley, which is what the panel it fills is titled
+- [ ] Three of the six images in `docs/screenshots/` are current (`title-screen`, `gameplay`, `boss-dungeon`). `negotiation`, `personalities` and `tests` still show the island build — `personalities` in particular is a hand-composed four-way comparison that a single run cannot reproduce. `docs/banner.png` was rebuilt for the walled city.
 
 ### Operational
 

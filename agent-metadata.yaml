@@ -1,24 +1,30 @@
-name: finalproject-multiagent
-version: 1
-owner: game-team
+# Machine-readable project contract, for coding agents.
+# Human-facing detail lives in DEVELOPER.md — this is the short version to read
+# first. Every field below was checked against the code. If you change one,
+# change the code or change this file, but never neither.
+
+name: kowloon-walled-city
+derived_from: "IslandEscape (MIT) — https://github.com/he-yufeng/IslandEscape"
 project_type: monorepo
-package_manager: pnpm-workspace
+package_manager: pnpm@10
+
+layout:
+  apps: [apps/web, apps/server]
+  packages: [packages/shared]
+
 runtime:
-  node: ">=22.12"
-  packageManager: "pnpm@10"
+  node: ">=22.12" # README requirement; not enforced in package.json engines
+  packageManager: pnpm@10.33.0
 
 language_policy:
-  default_language: English
-  documentation_must_be_english: true
-  code_comments_must_be_english: true
-  allow_non_english_in_user_facing_game_content: true
-
-workspace:
-  apps:
-    - apps/web
-    - apps/server
-  packages:
-    - packages/shared
+  documentation: English
+  code_comments: English
+  user_facing_game_text: English
+  exception: "Character display names stay Chinese — 辛仔 / 阿信 / 龙哥 (plus Simon)."
+  note: >-
+    Storage keys stay lowercase English (cake, goods, might, coins; work, train)
+    and display names live in RESOURCE_LABELS / LABOR_LABELS. Nothing in the
+    engine branches on a label.
 
 architecture:
   frontend:
@@ -28,63 +34,70 @@ architecture:
     state: pinia
     routing: vue-router
     style: tailwindcss-v4
+    rendering: "pixi.js for the 2D canvas, three for the 3D preview"
   backend:
     framework: fastify
     validation: zod
-    agent_sdk: "@openai/agents"
     orm: drizzle
     db: "sqlite(file) via @libsql/client"
+    llm_client: "hand-rolled fetch in apps/server/src/agents/llm.ts"
+    llm_sdk: "none — @openai/agents is a declared dependency but is imported nowhere"
+
+llm:
+  default_endpoint: https://api.deepseek.com
+  default_model: deepseek-flash
+  config: >-
+    OPENAI_BASE_URL and OPENAI_MODEL default as a matched pair in
+    apps/server/src/env.ts. Change them together, or requests 404 in a way
+    that reads like a bad API key.
+  note: >-
+    The default model is a reasoning model, so it spends most of its token
+    budget on chain-of-thought before answering — expect tens of seconds per
+    turn. See DEVELOPER.md §5.
 
 api_contract:
-  transport:
-    - REST
-    - SSE
+  transport: [REST, SSE]
   websocket_allowed: false
   endpoints:
-    - "POST /api/runs"
-    - "GET /api/runs/:runId/stream"
-    - "GET /api/saves"
-    - "POST /api/saves"
-    - "GET /api/saves/:id"
-    - "POST /api/saves/:id/load"
-
-security:
-  agent_runtime_location: apps/server
-  frontend_must_not_store_model_keys: true
-  required_env:
-    - OPENAI_API_KEY
-    - OPENAI_BASE_URL
-    - OPENAI_MODEL
-    - DB_FILE_NAME
-    - LOG_LEVEL
+    - "POST /api/games"
+    - "POST /api/games/:id/replay"
+    - "GET  /api/games/:id"
+    - "POST /api/games/:id/action"
+    - "GET  /api/games/:id/stream"
+  note: >-
+    There is no /api/runs and no /api/saves. Those belong to an earlier,
+    explicitly rejected design. The only remains are the unused
+    SaveSlotSummary and ApiError types in packages/shared — do not build on
+    them, and do not reintroduce that contract.
 
 shared_contract:
   package: "@game/shared"
-  exports:
-    - GameCommand
-    - GameEvent
-    - AgentRunRequest
-    - AgentStreamEvent
-    - GameStateSnapshot
-    - SaveSlotSummary
-    - ApiError
+  key_exports:
+    - GameState / GameStateSchema
+    - PlayerAction / PlayerActionSchema
+    - GameSSEEvent / GameSSEEventSchema
+    - CharacterId, AICharacterId
+    - Resources, RESOURCE_LABELS, LABOR_LABELS
+  rule: "The server is the authority for GameState. The frontend never mutates it."
+
+security:
+  agent_runtime_location: apps/server
+  frontend_must_not_hold_model_keys: true
+  required_env: [OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, DB_FILE_NAME, HOST, PORT, LOG_LEVEL]
+  secrets: "Never commit .env. It is gitignored."
 
 quality_gates:
-  required_commands:
-    - pnpm lint
-    - pnpm typecheck
-    - pnpm test
-    - pnpm test:e2e
+  commands: [pnpm lint, pnpm typecheck, pnpm test, pnpm build, pnpm test:e2e]
+  verified: "pnpm typecheck, pnpm test and pnpm build pass as of 2026-09-15."
+  note: >-
+    pnpm build uses apps/server/tsconfig.build.json, which excludes tests.
+    Plain tsconfig.json includes them so typecheck covers them, and tsc emits
+    everything it includes — building with it would drop compiled tests into
+    dist/, where vitest collects them a second time.
 
 forbidden:
-  - "Do not use WebSocket in v1"
-  - "Do not move agent runtime to frontend"
-  - "Do not introduce Prisma as primary ORM"
-  - "Do not add heavy UI libraries (Element Plus, Naive UI, Vuetify)"
-  - "Do not write project documentation in non-English languages"
-  - "Do not write source-code comments in non-English languages"
-
-notes:
-  - "Use root scripts as single entry points"
-  - "Prefer deterministic schema-driven contracts across web/server"
-  - "All docs and code comments must be authored in English"
+  - "Do not add WebSocket. REST + SSE is the contract."
+  - "Do not move the agent runtime to the frontend."
+  - "Do not introduce Prisma as the primary ORM."
+  - "Do not add heavy UI libraries (Element Plus, Naive UI, Vuetify)."
+  - "Do not write documentation or code comments in a non-English language."
