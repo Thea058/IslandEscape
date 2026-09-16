@@ -44,8 +44,15 @@ const LAMP_COLOR = 0xffcc44
 const STONE_COLOR = 0x4a4a52
 const STONE_HIGHLIGHT = 0x84848c
 const WOOD_COLOR = 0x7b5130
-const SAIL_COLOR = 0xf2eee3
+const ROPE_COLOR = 0xf2eee3
 const GOLD_COLOR = 0xe7bf57
+// Warm night tones for the market stall. The alley stage is deliberately cool, and
+// the two panels sit side by side in the same corner of the screen — lit the same
+// way, they would read as the same place.
+const MARKET_COLOR = 0x3d3226
+const MARKET_HIGHLIGHT = 0x8a7448
+const PLANK_COLOR = 0x5e4a2e
+const CLOTH_COLOR = 0xc2503f
 const NPC_COLORS: Record<CharacterId, number> = {
   player: 0xd94f41,
   san: 0xe08a3c,
@@ -247,7 +254,7 @@ function createTrainPreview() {
   for (let i = 0; i < 3; i += 1) {
     const wrap = new THREE.Mesh(
       new THREE.TorusGeometry(0.16, 0.028, 8, 18),
-      makeMaterial(SAIL_COLOR, 0.92, 0.01),
+      makeMaterial(ROPE_COLOR, 0.92, 0.01),
     )
     wrap.rotation.x = Math.PI / 2
     addMesh(group, wrap, 0, 0.36 + i * 0.2, 0)
@@ -256,49 +263,81 @@ function createTrainPreview() {
   return group
 }
 
+/**
+ * 夜市 — a stall under a cloth awning.
+ *
+ * The panel heading here reads "Night Market", and that heading is the contract:
+ * the preview has to look like what the label already promises. It used to be a
+ * sailboat on a blue stage, left over from the island build — the retheme renamed
+ * the panel but never repainted the model, and no type can check whether a shape
+ * looks like a boat.
+ */
 function createMerchantPreview() {
-  const group = createStage(0x1b5b90, 0x88d1ff)
+  const group = createStage(MARKET_COLOR, MARKET_HIGHLIGHT)
 
-  const hull = new THREE.Mesh(
-    new THREE.BoxGeometry(1.35, 0.42, 0.72),
-    makeMaterial(WOOD_COLOR, 0.82, 0.05),
+  const floor = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.16, 1.15),
+    makeMaterial(PLANK_COLOR, 0.78, 0.03),
   )
-  hull.position.y = 0.22
-  hull.rotation.z = -0.04
-  group.add(hull)
+  addMesh(group, floor, 0, 0.02, 0)
 
-  const bow = new THREE.Mesh(
-    new THREE.ConeGeometry(0.24, 0.36, 4),
-    makeMaterial(0x6a4329, 0.82, 0.05),
+  // Counter: a top slab over a solid front panel and two side panels. At ~300px a
+  // solid body reads as a stall; four thin legs would read as a table.
+  const counterTop = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.1, 0.66),
+    makeMaterial(WOOD_COLOR, 0.8, 0.04),
   )
-  bow.rotation.z = Math.PI / 2
-  addMesh(group, bow, 0.78, 0.24, 0)
+  addMesh(group, counterTop, 0, 0.86, 0)
 
-  const stern = new THREE.Mesh(
-    new THREE.BoxGeometry(0.22, 0.52, 0.62),
-    makeMaterial(0x6f4830, 0.84, 0.05),
+  const counterFront = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.78, 0.08),
+    makeMaterial(0x6a4329, 0.86, 0.03),
   )
-  addMesh(group, stern, -0.64, 0.3, 0)
+  addMesh(group, counterFront, 0, 0.44, 0.29)
 
-  const mast = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05, 0.06, 1.38, 8),
-    makeMaterial(0x5c3924, 0.9, 0.04),
-  )
-  addMesh(group, mast, 0.04, 0.95, 0)
+  for (const x of [-0.71, 0.71]) {
+    const side = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.78, 0.6),
+      makeMaterial(0x6a4329, 0.86, 0.03),
+    )
+    addMesh(group, side, x, 0.44, 0)
+  }
 
-  const sail = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 0.78, 0.03),
-    makeMaterial(SAIL_COLOR, 0.7, 0.02),
-  )
-  sail.position.set(0.36, 1.02, 0.02)
-  sail.rotation.y = -0.1
-  group.add(sail)
+  for (const x of [-0.74, 0.74]) {
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.05, 1.9, 10),
+      makeMaterial(0x5c3924, 0.9, 0.04),
+    )
+    addMesh(group, post, x, 0.95, -0.22)
+  }
 
-  const flag = new THREE.Mesh(
-    new THREE.BoxGeometry(0.2, 0.13, 0.02),
-    makeMaterial(0xc94a42, 0.56, 0.02),
+  // Tilted on purpose: a level awning reads as a lid on top of the panel.
+  const awning = new THREE.Mesh(
+    new THREE.BoxGeometry(1.72, 0.06, 0.95),
+    makeMaterial(CLOTH_COLOR, 0.92, 0.01),
   )
-  addMesh(group, flag, 0.18, 1.52, 0)
+  awning.rotation.x = -0.14
+  addMesh(group, awning, 0, 1.88, 0.06)
+
+  // Goods on the counter — crates left, jars centre, coins right.
+  addCrate(group, -0.5, 1.02, 0.02, 0.22, 0.2)
+  addCrate(group, -0.28, 1.0, 0.08, 0.18, -0.15)
+
+  const jar = (x: number, z: number) => {
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.075, 0.085, 0.2, 12),
+      makeMaterial(0x4f6b5a, 0.5, 0.08),
+    )
+    addMesh(group, body, x, 1.01, z)
+
+    const lid = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 0.03, 12),
+      makeMaterial(0x8a6a3a, 0.7, 0.05),
+    )
+    addMesh(group, lid, x, 1.125, z)
+  }
+  jar(0.08, -0.06)
+  jar(0.3, 0.1)
 
   for (let i = 0; i < 3; i += 1) {
     const coin = new THREE.Mesh(
@@ -306,8 +345,40 @@ function createMerchantPreview() {
       makeMaterial(GOLD_COLOR, 0.4, 0.32),
     )
     coin.rotation.x = Math.PI / 2
-    addMesh(group, coin, -0.16 + i * 0.16, 0.48 + i * 0.05, i % 2 === 0 ? -0.12 : 0.12)
+    addMesh(group, coin, 0.42 + i * 0.13, 0.925, i % 2 === 0 ? -0.16 : -0.02)
   }
+
+  // One lantern on a cord under the awning. Same lit-window yellow as the title
+  // logo and the alley lamp, so the whole city stays on one palette.
+  const lantern = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.2, 0.16),
+    new THREE.MeshStandardMaterial({
+      color: LAMP_COLOR,
+      emissive: LAMP_COLOR,
+      emissiveIntensity: 0.95,
+      roughness: 0.4,
+    }),
+  )
+  addMesh(group, lantern, 0.52, 1.6, 0.02)
+
+  const lanternHalo = new THREE.Mesh(
+    new THREE.SphereGeometry(0.26, 14, 12),
+    new THREE.MeshBasicMaterial({ color: LAMP_COLOR, transparent: true, opacity: 0.16 }),
+  )
+  addMesh(group, lanternHalo, 0.52, 1.6, 0.02)
+
+  const cord = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.16, 6),
+    makeMaterial(0x2b2f38, 0.9, 0.05),
+  )
+  addMesh(group, cord, 0.52, 1.78, 0.02)
+
+  // Hanging board — how a stall announces itself when the panel cannot render text.
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(0.24, 0.46, 0.05),
+    makeMaterial(0xd8c49a, 0.78, 0.02),
+  )
+  addMesh(group, board, -0.52, 1.42, 0.05)
 
   return group
 }

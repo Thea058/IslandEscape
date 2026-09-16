@@ -50,8 +50,8 @@ export class TileMap {
       }
     }
 
-    // Draw the market stall at the dock
-    this.drawMerchantShip()
+    // Draw the market barge moored at the dock
+    this.drawMarketBarge()
   }
 
   private drawTile(g: Graphics, tile: TileType, col: number, row: number) {
@@ -262,22 +262,39 @@ export class TileMap {
     }
   }
 
-  private drawMerchantShip() {
-    const ship = new Graphics()
-    // Position at dock area
-    ship.x = 17 * TILE_SIZE
-    ship.y = 8 * TILE_SIZE - 8
+  /**
+   * The market barge moored beside the dock tiles.
+   *
+   * It used to be a sailing yacht — a tall mast and a triangular white sail — which
+   * still read as the island long after the retheme had renamed everything around it.
+   * A flat cargo hull under a cloth awning says "goods for sale" instead, and the
+   * awning and lamp reuse the exact colours of the Night Market preview panel, so the
+   * sprite on the map and the model in the panel read as the same stall.
+   */
+  private drawMarketBarge() {
+    const barge = new Graphics()
+    // Moored just above the dock tiles.
+    barge.x = 17 * TILE_SIZE
+    barge.y = 8 * TILE_SIZE - 8
 
-    // Hull
-    ship.poly([0, 20, 4, 32, 28, 32, 32, 20]).fill(0x6b3a1f)
-    // Deck
-    ship.rect(4, 16, 24, 6).fill(0x8b5a2b)
-    // Mast
-    ship.rect(14, 0, 4, 18).fill(0x5a3a1a)
-    // Sail
-    ship.poly([18, 2, 18, 16, 30, 10]).fill(0xf5f0e0)
-    // Flag
-    ship.rect(14, 0, 8, 5).fill(0xcc3333)
+    // A plain rectangle, not a hull. A tapered bottom — narrower at the waterline
+    // than at the deck — is the shape that reads as a boat, so the two edges are
+    // kept the same length and the ends left square.
+    barge.rect(0, 22, 32, 10).fill(0x6b3a1f)
+    barge.rect(3, 20, 26, 4).fill(0x8b5a2b)
+
+    // Two posts carrying the awning. Same cloth red as the preview panel's.
+    barge.rect(4, 2, 2, 20).fill(0x5a3a1a)
+    barge.rect(22, 2, 2, 20).fill(0x5a3a1a)
+    barge.rect(4, 2, 20, 4).fill(0xc2503f)
+
+    // Cargo stacked under the awning — what this market actually trades in.
+    barge.rect(6, 13, 10, 8).fill(0x7b5130)
+    barge.rect(7, 6, 8, 7).fill(0x6a4329)
+    barge.rect(17, 15, 7, 6).fill(0x6a4329)
+
+    // One lamp, in the same lit-window yellow as the title logo and the panel.
+    barge.rect(18, 6, 3, 4).fill(0xffcc44)
 
     // Label
     const style = new TextStyle({
@@ -292,8 +309,8 @@ export class TileMap {
     label.x = 16
     label.y = -2
 
-    ship.addChild(label)
-    this.container.addChild(ship)
+    barge.addChild(label)
+    this.container.addChild(barge)
   }
 
   /** Animate water tiles (called each frame) — redraws waves with a moving phase. */
