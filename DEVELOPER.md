@@ -804,10 +804,10 @@ repoint `build` at `tsconfig.json`, that failure comes back.
 
 ### Leftover island art (the retheme is incomplete visually)
 
-- [ ] `TileMap.ts` still draws a **sailboat** (hull, mast, sail) on the market tile, labelled "MARKET"
-- [ ] `AudioManager.ts` still calls its track id `'island'` (`ISLAND_MELODY`, `startIslandBGM`)
-- [ ] Several source comments still describe the sea and the island (`TileMap.ts`, `GameWorld.ts`, `PlayerCombat.ts`)
-- [x] `interactionPreviewModels.ts` — the sandy-island default preview and its `addPalm` are gone; the idle state is now a back alley, which is what the panel it fills is titled
+- [x] `TileMap.ts` — the market sprite is no longer a sailboat. It is a flat cargo platform under a cloth awning, reusing the preview panel's cloth red and lamp yellow. The hull is a plain rectangle rather than a tapered one: a bottom edge narrower than the deck reads as a boat even after the sail and mast are gone.
+- [ ] `AudioManager.ts` still calls its track id `'island'` (`ISLAND_MELODY`, `ISLAND_BASS`, `startIslandBGM`) and still plays the island's "cheerful major-key" tune. This one is not a rename — it needs a new melody.
+- [ ] Stale comments: `TileMap.ts` ("sense of moving sea"), `PlayerCombat.ts` ("matching island Character.ts"), `tiles.ts` ("island map"), and the `DailyEvent` doc in `packages/shared/src/index.ts`, which still lists `drought` after the rename to `famine`.
+- [x] `interactionPreviewModels.ts` — the sandy-island default preview and its `addPalm` are gone; the idle state is now a back alley, which is what the panel it fills is titled. The market preview is a stall too, matching the "Night Market" heading above it.
 - [ ] Three of the six images in `docs/screenshots/` are current (`title-screen`, `gameplay`, `boss-dungeon`). `negotiation`, `personalities` and `tests` still show the island build — `personalities` in particular is a hand-composed four-way comparison that a single run cannot reproduce. `docs/banner.png` was rebuilt for the walled city.
 
 ### Operational
