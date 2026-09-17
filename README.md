@@ -2,7 +2,7 @@
 
 <img src="docs/banner.png" alt="Kowloon Walled City — 2D pixel-art survival game with LLM-powered AI agents" width="100%">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/he-yufeng/IslandEscape#license)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 [![Vue 3](https://img.shields.io/badge/Vue-3-42b883)](https://vuejs.org)
 [![Fastify](https://img.shields.io/badge/Fastify-server-black)](https://fastify.dev)
