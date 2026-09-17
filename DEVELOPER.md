@@ -545,12 +545,16 @@ The city map is a 20x15 grid. Each cell has a tile type:
 
 ```typescript
 type TileType =
-  | 'water' | 'sand' | 'grass' | 'path'      // ground
+  | 'wall' | 'sand' | 'grass' | 'path'       // ground
   | 'house' | 'tree' | 'rock'                // scenery
-  | 'workshop' | 'dojo' | 'dock' | 'cave'    // interactable
+  | 'workshop' | 'dojo' | 'gate' | 'cave'    // interactable
 ```
 
-`MAP_RAW` is the layout in single-character form (`W` water, `X` workshop, `F` dojo, `D` dock, `C` cave, …) so the map is editable as ASCII art; `MAP_KEY` expands it into `CITY_MAP`. `getTile(col, row)` returns `'water'` out of bounds, which keeps pathfinding from having to bounds-check.
+`MAP_RAW` is the layout in single-character form (`W` wall, `X` workshop, `F` dojo, `M` gate, `C` cave, …) so the map is editable as ASCII art; `MAP_KEY` expands it into `CITY_MAP`. `getTile(col, row)` returns `'wall'` out of bounds, which keeps pathfinding from having to bounds-check.
+
+Note that the `W` characters are not a wall: Kowloon Walled City was inland, and what hemmed it in by the 1970s was the sheer mass of its own outer tenements. The key kept its old letter because the map data did not move, but the tile means "buildings you cannot walk through" and is drawn as such.
+
+One seam is worth knowing about before editing the map. `MAP_KEY[ch] ?? 'wall'` means an unknown character silently becomes a building rather than throwing, so a typo in `MAP_RAW` shows up as a stray rooftop, not an error — and the compiler cannot see it, because the row is just a string. Change a character here and change its `MAP_KEY` entry in the same edit.
 
 The interactable tiles are the interesting ones — `getInteraction(tile)` returns the action id directly:
 
@@ -558,7 +562,7 @@ The interactable tiles are the interesting ones — `getInteraction(tile)` retur
 |------|-----------------|---------|
 | `workshop` | `'work'` | Where odd jobs happen |
 | `dojo` | `'train'` | Where kung fu is practiced |
-| `dock` | `'merchant'` | The night market |
+| `gate` | `'merchant'` | The night market |
 | `cave` | `'dungeon'` | The boss dungeon |
 
 Returning the same id the labor action uses means the interaction menu can offer the matching action without a translation table in between.
@@ -571,10 +575,11 @@ Returning the same id the labor action uses means the interaction menu can offer
 
 Draws every tile with PixiJS `Graphics` — colored rectangles and simple shapes:
 
-- Water: blue with wave animation
-- Grass: green, sand: tan, path: grey flagstone
-- Dojo: darker roof, workshop: crates, dock: the market stall
+- Grass: green, sand: tan, path: a worn tan track
+- Dojo: cool grey flagstones, workshop: crates, gate: warm stone paving with a lantern
 - Trees: green circles on brown trunks
+
+Two tiles are **not** drawn per tile, because drawing them that way did not work. The border is one pass over the whole map (`drawCityWallRegion`), packing rooftops on an 8px sub-grid so a single roof can be larger than a tile and the tile grid never shows through; and the market stall (`drawGateMarket`) is one sprite spanning several tiles. The reason is in the colour comment at the top of the file, and it is the most useful thing in it: a pattern repeating every 32 pixels reads as a texture no matter how it is coloured, so the fix is to change the layer being drawn, not the palette.
 
 All art is **programmatic** — no image files. If you want sprite sheets later, replace the `Graphics` drawing calls with `Sprite` loading.
 
@@ -618,7 +623,7 @@ Phase-aware popup when pressing E near something:
 - `player_labor` + dojo → "practice kung fu (+1 Might)"
 - `player_labor` + anything else → "You must labor first!"
 - `player_trade` + resident → open the negotiation panel
-- `player_trade` + dock → sell interface (quantity inputs, live price calculation)
+- `player_trade` + gate → sell interface (quantity inputs, live price calculation)
 - `player_trade` + cave → enter the dungeon (once per day)
 
 ### DialoguePanel.vue
@@ -806,9 +811,9 @@ repoint `build` at `tsconfig.json`, that failure comes back.
 
 - [x] `TileMap.ts` — the market sprite is no longer a sailboat. It is a flat cargo platform under a cloth awning, reusing the preview panel's cloth red and lamp yellow. The hull is a plain rectangle rather than a tapered one: a bottom edge narrower than the deck reads as a boat even after the sail and mast are gone.
 - [ ] `AudioManager.ts` still calls its track id `'island'` (`ISLAND_MELODY`, `ISLAND_BASS`, `startIslandBGM`) and still plays the island's "cheerful major-key" tune. This one is not a rename — it needs a new melody.
-- [ ] Stale comments: `TileMap.ts` ("sense of moving sea"), `PlayerCombat.ts` ("matching island Character.ts"), `tiles.ts` ("island map"), and the `DailyEvent` doc in `packages/shared/src/index.ts`, which still lists `drought` after the rename to `famine`.
+- [ ] Stale comments: `dungeon/PlayerCombat.ts:17` ("matching island Character.ts"), and the `DailyEvent` doc in `packages/shared/src/index.ts`, which still lists `drought` after the rename to `famine`. Two entries used to be listed here and were wrong to: `TileMap.ts` and `tiles.ts` do mention the sea and the island, but deliberately — they record what the retheme replaced, which is the most useful thing in either comment. Do not "clean" them.
 - [x] `interactionPreviewModels.ts` — the sandy-island default preview and its `addPalm` are gone; the idle state is now a back alley, which is what the panel it fills is titled. The market preview is a stall too, matching the "Night Market" heading above it.
-- [ ] Three of the six images in `docs/screenshots/` are current (`title-screen`, `gameplay`, `boss-dungeon`). `negotiation`, `personalities` and `tests` still show the island build — `personalities` in particular is a hand-composed four-way comparison that a single run cannot reproduce. `docs/banner.png` was rebuilt for the walled city.
+- [ ] Five of the six images in `docs/screenshots/` are current (`title-screen`, `gameplay`, `boss-dungeon`, `negotiation`, `personalities`). `tests` is the last one left: it shows 14 tests and no server suite, against 24 now. `personalities` is assembled by hand from three separate negotiations, so one run cannot reproduce it, and its caption says "four" on purpose — that is how many personalities exist, not how many the image shows, so it is not a mismatch to fix. `docs/banner.png` was rebuilt for the walled city.
 
 ### Operational
 

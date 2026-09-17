@@ -3,7 +3,7 @@
 // ============================================================
 
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
-import { CITY_MAP, TILE_SIZE, MAP_COLS, MAP_ROWS, type TileType } from './tiles'
+import { CITY_MAP, TILE_SIZE, MAP_COLS, MAP_ROWS, getTile, type TileType } from './tiles'
 
 // ----- Color Palette -----
 
@@ -33,12 +33,21 @@ const WALL_ROOF_TONES = [WALL_ROOF_DARK, WALL_ROOF, WALL_ROOF_MID, WALL_ROOF_LIT
 /** Width of the alley left between two rooftops. */
 const WALL_ALLEY_W = 1
 
+// The gate's paving. Warm stone, and deliberately lighter and browner than the
+// dojo's flagstones — those two are the only stone floors on the map and they
+// should not read as the same place. The lantern matches the market lamps and
+// the lit windows, which is what ties the gate to the buildings around it.
+const GATE_STONE = 0x9c8b73
+const GATE_SLAB = 0x8a7a63
+const GATE_CURB = 0x5f5244
+const GATE_LANTERN = 0xffcc44
+
 const COLORS: Record<TileType, number> = {
   wall: WALL_ROOF,
   sand: 0xe8d5a3,
   grass: 0x5b9a3e,
   dojo: 0x6b6b73,
-  dock: 0x8b6b42,
+  gate: GATE_STONE,
   house: 0xa0522d,
   tree: 0x2d6e1e,
   rock: 0x808080,
@@ -103,8 +112,8 @@ export class TileMap {
       case 'dojo':
         this.drawDojo(g)
         break
-      case 'dock':
-        this.drawDock(g)
+      case 'gate':
+        this.drawGate(g, col, row)
         break
       case 'house':
         g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0x5b9a3e) // grass base
@@ -276,14 +285,49 @@ export class TileMap {
     }
   }
 
-  /** A timber platform. There is no water under it any more. */
-  private drawDock(g: Graphics) {
-    g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0x8b6b42)
-    // Plank lines
-    for (let i = 0; i < 4; i++) {
-      g.moveTo(0, 8 * i + 4)
-        .lineTo(TILE_SIZE, 8 * i + 4)
-        .stroke({ color: 0x704a28, width: 1, alpha: 0.4 })
+  /**
+   * 城门 — the gate. It is the one gap in the mass of buildings, which is why the
+   * market sets up on it: the stall drawn by drawGateMarket sits directly on the
+   * top-right tile of this pocket.
+   *
+   * This is the one place the per-tile drawing rule still holds. The border had to
+   * be drawn in a single pass because a 32px repeat reads as a texture across a
+   * large area — but the gate is four tiles, and the dojo, the path and the sand
+   * are all drawn per tile at that size without turning into one.
+   *
+   * The curb is not decoration. It is drawn only where a gate tile touches a
+   * building, so it traces the doorway the buildings actually leave open, instead
+   * of outlining all four sides of a tile and turning the gap back into a slab.
+   */
+  private drawGate(g: Graphics, col: number, row: number) {
+    g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(GATE_STONE)
+    // Slabs, laid two to a tile. Coarser than the dojo's four bands on purpose:
+    // the two stone floors should not read as the same place.
+    for (let sy = 0; sy < 2; sy++) {
+      for (let sx = 0; sx < 2; sx++) {
+        g.rect(sx * 16 + 3, sy * 16 + 3, 10, 10).fill(GATE_SLAB)
+      }
+    }
+
+    const frame = { color: GATE_CURB, width: 3 }
+    if (getTile(col, row - 1) === 'wall') g.moveTo(0, 1.5).lineTo(TILE_SIZE, 1.5).stroke(frame)
+    if (getTile(col, row + 1) === 'wall') {
+      g.moveTo(0, TILE_SIZE - 1.5).lineTo(TILE_SIZE, TILE_SIZE - 1.5).stroke(frame)
+    }
+    if (getTile(col - 1, row) === 'wall') g.moveTo(1.5, 0).lineTo(1.5, TILE_SIZE).stroke(frame)
+    if (getTile(col + 1, row) === 'wall') {
+      g.moveTo(TILE_SIZE - 1.5, 0).lineTo(TILE_SIZE - 1.5, TILE_SIZE).stroke(frame)
+    }
+
+    // A lantern on each gate tile that touches the buildings — so exactly the two
+    // tiles the mass closes in on, either side of the way through. Same yellow as
+    // the market lamps and the lit windows, which is what ties the gate to the
+    // buildings rather than leaving it a lit patch on the ground.
+    const inTheGap = getTile(col, row - 1) === 'wall' || getTile(col + 1, row) === 'wall'
+    if (inTheGap) {
+      g.circle(16, 16, 8).fill({ color: GATE_LANTERN, alpha: 0.12 })
+      g.circle(16, 16, 3).fill(GATE_LANTERN)
+      g.circle(16, 16, 1.4).fill(0xfff0c0)
     }
   }
 

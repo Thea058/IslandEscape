@@ -38,7 +38,7 @@ The model proposes; the engine disposes. Every action an NPC wants to take is a 
 
 Four NPCs, four system prompts, four very different ways to do business. Here they are answering the *exact same* opening offer — "I'll buy 3 Kong Soh Biscuits for 10 Coins":
 
-![The same offer answered by four different AI personalities](docs/screenshots/personalities.png)
+![The same offer answered by four different AI personalities](docs/screenshots/personalities.jpg)
 
 | Character | Personality | How they play |
 |-----------|-------------|---------------|
@@ -53,7 +53,7 @@ Friendship is real state, not flavor text. Successful trades raise an NPC's rega
 
 Walk up to a resident, press **E**, and you're in a conversation. You can use a quick-trade template or just type what you want. Each exchange round is a real LLM call; the model reads the game state, its own personality, its friendship level with you, and the conversation so far, then comes back with a reply and a structured proposal you can accept, counter, or reject.
 
-<div align="center"><img src="docs/screenshots/negotiation.png" alt="Negotiating a trade with 辛仔, the guarded lone wolf" width="42%"></div>
+<div align="center"><img src="docs/screenshots/negotiation.jpg" alt="Negotiating a trade with Simon, the cautious hacker" width="42%"></div>
 
 ```
 You send a message  →  NPC thinks (LLM call)  →  NPC replies with a proposal  →  Accept / Counter / Reject

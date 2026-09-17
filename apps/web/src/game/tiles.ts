@@ -9,7 +9,7 @@ export type TileType =
   | 'sand'
   | 'grass'
   | 'dojo'
-  | 'dock'
+  | 'gate'
   | 'house'
   | 'tree'
   | 'rock'
@@ -48,7 +48,7 @@ export function getInteraction(tile: TileType): string | null {
       return 'work'
     case 'dojo':
       return 'train'
-    case 'dock':
+    case 'gate':
       return 'merchant'
     case 'cave':
       return 'dungeon'
@@ -57,14 +57,14 @@ export function getInteraction(tile: TileType): string | null {
   }
 }
 
-// W = wall, S = sand, G = grass, F = dojo (武馆), D = dock,
+// W = wall, S = sand, G = grass, F = dojo (武馆), M = gate (城门),
 // H = house, T = tree, R = rock, X = workshop (工场), P = path
 const MAP_KEY: Record<string, TileType> = {
   W: 'wall',
   S: 'sand',
   G: 'grass',
   F: 'dojo',
-  D: 'dock',
+  M: 'gate',
   H: 'house',
   T: 'tree',
   R: 'rock',
@@ -86,8 +86,8 @@ const MAP_RAW: string[] = [
   'WWSGGPGHPGGGGGSSWWWW', // row 6
   'WSSGGPGGPGGFFFGSWWWW', // row 7
   'WSXGGPGGPGGFFFGSSWWW', // row 8
-  'WSSGGPGGPGGFFFGSDDWW', // row 9
-  'WWSGGPPPPPGGGGSDDWWW', // row 10
+  'WSSGGPGGPGGFFFGSMMWW', // row 9
+  'WWSGGPPPPPGGGGSMMWWW', // row 10
   'WWSSGTRGGGTRGSSSSWWW', // row 11
   'WWWSSSSSSSSSSSSSWWWW', // row 12
   'WWWWWWSSSSSSWWWWWWWW', // row 13
@@ -129,7 +129,7 @@ export const CHARACTER_POSITIONS: Record<CharacterId, MapPosition> = {
 /** Important locations on the map */
 export const LOCATIONS = {
   street_center: { col: 7, row: 6 },
-  dock: { col: 16, row: 9 },
+  gate: { col: 16, row: 9 },
   workshop_1: { col: 18, row: 5 },
   workshop_2: { col: 1, row: 8 },
   dojo: { col: 13, row: 8 },
@@ -178,7 +178,7 @@ export function getActionTarget(
     case 'train':
       return findNearestTile(fromCol, fromRow, 'dojo') ?? LOCATIONS.dojo
     case 'trade_merchant':
-      return findNearestTile(fromCol, fromRow, 'dock') ?? LOCATIONS.dock
+      return findNearestTile(fromCol, fromRow, 'gate') ?? LOCATIONS.gate
     default:
       return LOCATIONS.street_center
   }

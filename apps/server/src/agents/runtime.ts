@@ -72,7 +72,7 @@ export async function runAITurns(
         if (!char || char.tradeSlots <= 0) break
 
         // Re-broadcast a per-step decision so the client can animate the AI
-        // walking to the trade target (dock for merchant, peer's tile for peer).
+        // walking to the trade target (gate for merchant, peer's tile for peer).
         broadcast({
           type: 'ai_decision',
           characterId: charId,
