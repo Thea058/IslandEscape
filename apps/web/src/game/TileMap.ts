@@ -7,8 +7,34 @@ import { CITY_MAP, TILE_SIZE, MAP_COLS, MAP_ROWS, type TileType } from './tiles'
 
 // ----- Color Palette -----
 
+// The border was sea until the retheme. Kowloon Walled City was inland, and by
+// the 1970s what hemmed it in was not a wall but the sheer mass of its own outer
+// buildings — so these are the tones that mass is built from.
+//
+// Three earlier drafts are worth recording, because all three failed the same way.
+// The first stood three tall blocks on a brick base; the second put alleys between
+// them; the third cut each tile into a 3x3 grid of rooftops. Read at actual size
+// they came out as vertical stripes, then a fence, then a brick lattice — a
+// texture every time. The lesson is in the shape of the mistake rather than the
+// colouring: a pattern that repeats every 32 pixels *is* a texture, no matter how
+// it is painted, and a rooftop only becomes a rooftop once it is closed on all
+// four sides AND free to be larger than one tile. That is why the drawing below
+// packs the whole border in one pass.
+const WALL_ROOF = 0x4a3b33
+const WALL_ROOF_MID = 0x574434
+const WALL_ROOF_LIT = 0x6a5645
+const WALL_ROOF_DARK = 0x382a20
+const WALL_ALLEY = 0x1d1713
+const WALL_WINDOW = 0xffcc44
+
+/** Rooftop tones, picked from in a hash order so no two tiles come out alike. */
+const WALL_ROOF_TONES = [WALL_ROOF_DARK, WALL_ROOF, WALL_ROOF_MID, WALL_ROOF_LIT]
+
+/** Width of the alley left between two rooftops. */
+const WALL_ALLEY_W = 1
+
 const COLORS: Record<TileType, number> = {
-  water: 0x2389da,
+  wall: WALL_ROOF,
   sand: 0xe8d5a3,
   grass: 0x5b9a3e,
   dojo: 0x6b6b73,
@@ -16,16 +42,17 @@ const COLORS: Record<TileType, number> = {
   house: 0xa0522d,
   tree: 0x2d6e1e,
   rock: 0x808080,
-  workshop: 0x1a7ab5,
+  // Packed earth — the workshop stands outside the wall now, not on a jetty.
+  workshop: 0x6e6455,
   path: 0xc4a96a,
   cave: 0x1a1a2e,
 }
 
 export class TileMap {
   public container: Container
-  private waterFrame = 0
-  /** Animated water/workshop tiles — redrawn each frame with shifting waves. */
-  private waterTiles: Array<{ g: Graphics; type: TileType; col: number; row: number }> = []
+  private animFrame = 0
+  /** The workshop tiles are the only animated ones left — their crates bob. */
+  private animatedTiles: Array<{ g: Graphics; col: number; row: number }> = []
 
   constructor() {
     this.container = new Container()
@@ -44,23 +71,26 @@ export class TileMap {
         this.drawTile(g, tile, col, row)
         this.container.addChild(g)
 
-        if (tile === 'water' || tile === 'workshop') {
-          this.waterTiles.push({ g, type: tile, col, row })
+        if (tile === 'workshop') {
+          this.animatedTiles.push({ g, col, row })
         }
       }
     }
 
-    // Draw the market barge moored at the dock
-    this.drawMarketBarge()
+    // These two cover the whole map rather than a single tile, so they go last.
+    this.drawCityWallRegion()
+    this.drawGateMarket()
   }
 
   private drawTile(g: Graphics, tile: TileType, col: number, row: number) {
     const baseColor = COLORS[tile]
 
     switch (tile) {
-      case 'water':
-        this.drawWater(g, baseColor)
-        break
+      case 'wall':
+        // Drawn as a single pass over the whole border instead of tile by tile —
+        // see drawCityWallRegion. Nothing to do here, and deliberately no grid
+        // line either: a 32px grid over the rooftops would put the tiling back.
+        return
       case 'sand':
         g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(baseColor)
         // Sand texture dots
@@ -107,23 +137,83 @@ export class TileMap {
     g.rect(0, 0, TILE_SIZE, TILE_SIZE).stroke({ color: 0x000000, alpha: 0.06, width: 0.5 })
   }
 
-  private drawWater(g: Graphics, color: number, phase = 0) {
-    g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(color)
-    // Animated wave lines — y-offset is a sin wave so adjacent water tiles
-    // appear to ripple in/out of phase, giving a sense of moving sea.
-    const w1 = Math.sin(phase) * 2
-    const w2 = Math.sin(phase * 1.3 + 1.6) * 2
-    g.moveTo(4, 10 + w1).lineTo(12, 8 + w1).lineTo(20, 10 + w1).lineTo(28, 8 + w1)
-      .stroke({ color: 0x5bb8e8, width: 1.5, alpha: 0.55 })
-    g.moveTo(2, 22 + w2).lineTo(10, 20 + w2).lineTo(18, 22 + w2).lineTo(26, 20 + w2)
-      .stroke({ color: 0x7fc8f0, width: 1.5, alpha: 0.5 })
+  /**
+   * 城墙 / 楼群 — the mass of outer buildings that encloses the city.
+   *
+   * This replaced the sea. It is deliberately static: the old water rippled on a
+   * sine wave, and moving sea is precisely the read the retheme had to lose.
+   *
+   * It runs over the whole border rather than per tile because the thing being
+   * drawn is bigger than a tile. The colour comment at the top of this file records
+   * the three per-tile versions that failed before this one.
+   */
+  private drawCityWallRegion() {
+    const wall = new Graphics()
 
-    // Periodic shimmer dot — twinkles into existence based on phase.
-    const shimmer = Math.max(0, Math.sin(phase * 0.8))
-    if (shimmer > 0.55) {
-      g.circle(8 + Math.sin(phase) * 4, 6, 1).fill({ color: 0xffffff, alpha: shimmer * 0.5 })
-      g.circle(24 - Math.sin(phase) * 3, 26, 1).fill({ color: 0xffffff, alpha: shimmer * 0.4 })
+    // The packing runs on a finer grid than the map's tiles. On the tile grid the
+    // smallest possible rooftop was 32px across, which came out as a handful of
+    // huge flat slabs: a rooftop has to be free to be smaller than a tile as well
+    // as larger, and 8px is the step that gives that range.
+    const SUB = 8
+    const perTile = TILE_SIZE / SUB
+    const subCols = MAP_COLS * perTile
+    const subRows = MAP_ROWS * perTile
+
+    const isWall = (sc: number, sr: number) =>
+      CITY_MAP[Math.floor(sr / perTile)]?.[Math.floor(sc / perTile)] === 'wall'
+
+    const claimed = new Set<number>()
+    const key = (sc: number, sr: number) => sr * subCols + sc
+    const freeRun = (sc: number, sr: number, w: number) => {
+      for (let i = 0; i < w; i++) {
+        if (!isWall(sc + i, sr) || claimed.has(key(sc + i, sr))) return false
+      }
+      return true
     }
+
+    let block = 0
+    for (let sr = 0; sr < subRows; sr++) {
+      for (let sc = 0; sc < subCols; sc++) {
+        if (!isWall(sc, sr) || claimed.has(key(sc, sr))) continue
+
+        // Grow right and then down, stopping at a hash-derived size. Packing the
+        // region into rectangles this way is what gives the rooftops a range of
+        // sizes; the largest span several tiles, which no per-tile pass could do.
+        let w = 1
+        const maxW = 1 + ((sc * 7 + sr * 13) % 4)
+        while (w < maxW && freeRun(sc + w, sr, 1)) w++
+        let h = 1
+        const maxH = 1 + ((sc * 11 + sr * 5) % 4)
+        while (h < maxH && freeRun(sc, sr + h, w)) h++
+
+        for (let j = 0; j < h; j++) {
+          for (let i = 0; i < w; i++) claimed.add(key(sc + i, sr + j))
+        }
+
+        const x = sc * SUB
+        const y = sr * SUB
+        // The alley goes down first and the rooftop sits inset inside it, so every
+        // block ends in shadow on all four sides. That is the whole reason these
+        // read as buildings instead of as patches of colour.
+        wall.rect(x, y, w * SUB, h * SUB).fill(WALL_ALLEY)
+        wall
+          .rect(x + WALL_ALLEY_W, y + WALL_ALLEY_W, w * SUB - WALL_ALLEY_W * 2, h * SUB - WALL_ALLEY_W * 2)
+          .fill(WALL_ROOF_TONES[block % WALL_ROOF_TONES.length]!)
+        block++
+      }
+    }
+
+    // Lit windows, scattered across the rooftops. The hash runs on the sub-grid,
+    // which is four times finer than the map — so this divisor is roughly four
+    // times larger than it looks. At % 7 the border glittered.
+    for (let sr = 0; sr < subRows; sr++) {
+      for (let sc = 0; sc < subCols; sc++) {
+        if (!isWall(sc, sr) || (sc * 31 + sr * 17) % 29 !== 0) continue
+        wall.rect(sc * SUB + 3, sr * SUB + 3, 2, 2).fill(WALL_WINDOW)
+      }
+    }
+
+    this.container.addChild(wall)
   }
 
   private drawSandDots(g: Graphics) {
@@ -186,14 +276,13 @@ export class TileMap {
     }
   }
 
+  /** A timber platform. There is no water under it any more. */
   private drawDock(g: Graphics) {
-    g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0x2389da) // water base
-    // Wooden planks
-    g.rect(2, 0, TILE_SIZE - 4, TILE_SIZE).fill(0x8b6b42)
+    g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0x8b6b42)
     // Plank lines
     for (let i = 0; i < 4; i++) {
-      g.moveTo(2, 8 * i + 4)
-        .lineTo(TILE_SIZE - 2, 8 * i + 4)
+      g.moveTo(0, 8 * i + 4)
+        .lineTo(TILE_SIZE, 8 * i + 4)
         .stroke({ color: 0x704a28, width: 1, alpha: 0.4 })
     }
   }
@@ -226,10 +315,12 @@ export class TileMap {
     g.ellipse(12, 14, 4, 3).fill({ color: 0xaaaaaa, alpha: 0.6 })
   }
 
-  /** 工场 — the workshop on the waterfront, where 打工 happens. */
+  /** 工场 — the workshop outside the wall, where 打工 happens. */
   private drawWorkshop(g: Graphics, phase = 0) {
-    this.drawWater(g, 0x1a7ab5, phase)
-    // Crate stack, bobbing gently on the same phase as the wave
+    // Packed earth, not water: the workshop stands on the ground outside the
+    // wall, and the crates it stacks are what the player comes here to shift.
+    g.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(COLORS.workshop)
+    // Crate stack, bobbing gently
     const bob = Math.sin(phase * 1.2) * 1.5
     g.rect(10, 12 + bob, 12, 12).fill({ color: 0xb07a3a, alpha: 0.9 })
     g.moveTo(10, 18 + bob).lineTo(22, 18 + bob).stroke({ color: 0x7a5020, width: 1, alpha: 0.9 })
@@ -263,38 +354,38 @@ export class TileMap {
   }
 
   /**
-   * The market barge moored beside the dock tiles.
+   * The market stall that serves the gate tiles.
    *
    * It used to be a sailing yacht — a tall mast and a triangular white sail — which
    * still read as the island long after the retheme had renamed everything around it.
-   * A flat cargo hull under a cloth awning says "goods for sale" instead, and the
+   * A flat cargo platform under a cloth awning says "goods for sale" instead, and the
    * awning and lamp reuse the exact colours of the Night Market preview panel, so the
    * sprite on the map and the model in the panel read as the same stall.
    */
-  private drawMarketBarge() {
-    const barge = new Graphics()
-    // Moored just above the dock tiles.
-    barge.x = 17 * TILE_SIZE
-    barge.y = 8 * TILE_SIZE - 8
+  private drawGateMarket() {
+    const stall = new Graphics()
+    // Stands on the ground, just above the gate tiles.
+    stall.x = 17 * TILE_SIZE
+    stall.y = 8 * TILE_SIZE - 8
 
-    // A plain rectangle, not a hull. A tapered bottom — narrower at the waterline
-    // than at the deck — is the shape that reads as a boat, so the two edges are
-    // kept the same length and the ends left square.
-    barge.rect(0, 22, 32, 10).fill(0x6b3a1f)
-    barge.rect(3, 20, 26, 4).fill(0x8b5a2b)
+    // A plain rectangle. A tapered base — narrower at the bottom than at the top —
+    // was what made the old cargo hull read as a boat, so both edges are kept the
+    // same length and the ends left square.
+    stall.rect(0, 22, 32, 10).fill(0x6b3a1f)
+    stall.rect(3, 20, 26, 4).fill(0x8b5a2b)
 
     // Two posts carrying the awning. Same cloth red as the preview panel's.
-    barge.rect(4, 2, 2, 20).fill(0x5a3a1a)
-    barge.rect(22, 2, 2, 20).fill(0x5a3a1a)
-    barge.rect(4, 2, 20, 4).fill(0xc2503f)
+    stall.rect(4, 2, 2, 20).fill(0x5a3a1a)
+    stall.rect(22, 2, 2, 20).fill(0x5a3a1a)
+    stall.rect(4, 2, 20, 4).fill(0xc2503f)
 
     // Cargo stacked under the awning — what this market actually trades in.
-    barge.rect(6, 13, 10, 8).fill(0x7b5130)
-    barge.rect(7, 6, 8, 7).fill(0x6a4329)
-    barge.rect(17, 15, 7, 6).fill(0x6a4329)
+    stall.rect(6, 13, 10, 8).fill(0x7b5130)
+    stall.rect(7, 6, 8, 7).fill(0x6a4329)
+    stall.rect(17, 15, 7, 6).fill(0x6a4329)
 
     // One lamp, in the same lit-window yellow as the title logo and the panel.
-    barge.rect(18, 6, 3, 4).fill(0xffcc44)
+    stall.rect(18, 6, 3, 4).fill(0xffcc44)
 
     // Label
     const style = new TextStyle({
@@ -309,22 +400,18 @@ export class TileMap {
     label.x = 16
     label.y = -2
 
-    barge.addChild(label)
-    this.container.addChild(barge)
+    stall.addChild(label)
+    this.container.addChild(stall)
   }
 
-  /** Animate water tiles (called each frame) — redraws waves with a moving phase. */
+  /** Animate the workshop tiles (called each frame) — their crates bob. */
   public update(delta: number) {
-    this.waterFrame += delta * 0.04
-    for (const { g, type, col, row } of this.waterTiles) {
-      // Per-tile phase offset so neighbouring tiles ripple out of sync.
-      const phase = this.waterFrame + col * 0.55 + row * 0.4
+    this.animFrame += delta * 0.04
+    for (const { g, col, row } of this.animatedTiles) {
+      // Per-tile phase offset so neighbouring workshops bob out of sync.
+      const phase = this.animFrame + col * 0.55 + row * 0.4
       g.clear()
-      if (type === 'water') {
-        this.drawWater(g, COLORS.water, phase)
-      } else {
-        this.drawWorkshop(g, phase)
-      }
+      this.drawWorkshop(g, phase)
       // Re-apply the subtle grid line (drawTile adds it; we cleared it above).
       g.rect(0, 0, TILE_SIZE, TILE_SIZE).stroke({ color: 0x000000, alpha: 0.06, width: 0.5 })
     }

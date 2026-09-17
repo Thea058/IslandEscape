@@ -5,7 +5,7 @@
 import type { CharacterId } from '@game/shared'
 
 export type TileType =
-  | 'water'
+  | 'wall'
   | 'sand'
   | 'grass'
   | 'dojo'
@@ -24,7 +24,7 @@ export const MAP_ROWS = 15
 /** Whether a character can walk on this tile */
 export function isWalkable(tile: TileType): boolean {
   switch (tile) {
-    case 'water':
+    case 'wall':
     case 'house':
     case 'tree':
     case 'rock':
@@ -57,10 +57,10 @@ export function getInteraction(tile: TileType): string | null {
   }
 }
 
-// W = water, S = sand, G = grass, F = dojo (武馆), D = dock,
+// W = wall, S = sand, G = grass, F = dojo (武馆), D = dock,
 // H = house, T = tree, R = rock, X = workshop (工场), P = path
 const MAP_KEY: Record<string, TileType> = {
-  W: 'water',
+  W: 'wall',
   S: 'sand',
   G: 'grass',
   F: 'dojo',
@@ -73,7 +73,9 @@ const MAP_KEY: Record<string, TileType> = {
   C: 'cave',
 }
 
-// 20 columns x 15 rows island map
+// 20 columns x 15 rows Walled City map. The map data is unchanged from the
+// island build — the same border cells now hold tenement blocks instead of sea,
+// which is why no spawn point or walking route had to be re-checked.
 const MAP_RAW: string[] = [
   'WWWWWWWWWWWWWWWWWWWW', // row 0
   'WWWWSSSSSSSSSSSSWWWW', // row 1
@@ -93,12 +95,12 @@ const MAP_RAW: string[] = [
 ]
 
 export const CITY_MAP: TileType[][] = MAP_RAW.map((row) =>
-  row.split('').map((ch) => MAP_KEY[ch] ?? 'water'),
+  row.split('').map((ch) => MAP_KEY[ch] ?? 'wall'),
 )
 
-/** Get tile at grid position, or water if out of bounds */
+/** Get tile at grid position, or wall if out of bounds */
 export function getTile(col: number, row: number): TileType {
-  if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) return 'water'
+  if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) return 'wall'
   return CITY_MAP[row]![col]!
 }
 

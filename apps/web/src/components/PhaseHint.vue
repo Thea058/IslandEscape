@@ -24,7 +24,7 @@ const hint = computed<HintData>(() => {
       show: true,
       step: 'Step 1 of 2',
       title: `LABOR — ${LABOR_LABELS.work} or ${LABOR_LABELS.train}`,
-      detail: 'Walk to the workshop (crates by the water) for odd jobs, or the martial arts hall (grey flagstones) to practice kung fu. Press E.',
+      detail: 'Walk to the workshop (crates outside the wall) for odd jobs, or the martial arts hall (grey flagstones) to practice kung fu. Press E.',
       tone: 'labor',
     }
   }
